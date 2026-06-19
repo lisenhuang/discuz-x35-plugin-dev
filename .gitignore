@@ -1,0 +1,54 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.idea/
+
+# VSCode — ignore everything except shareable project config
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# PHP / Composer
+/vendor/
+composer.phar
+.env
+.env.local
+
+# Discuz runtime / cache
+data/cache/
+data/log/
+data/tmp/
+data/avatar/
+data/attachment/
+config/config_global.php
+config/config_ucenter.php
+uc_server/data/

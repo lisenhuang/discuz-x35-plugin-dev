@@ -1,0 +1,20 @@
+{
+  // Instructions for the built-in Source Control "Generate Commit Message"
+  // (sparkle) button. Requires the GitHub Copilot + Copilot Chat extensions.
+  // These are appended to the prompt used to generate the commit message.
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    { "text": "Open with a single imperative subject line under ~50 chars, capitalized, no trailing period; prefix with a Conventional Commits type (feat, fix, refactor, docs, chore, perf, style, test) plus an optional scope, e.g. 'fix(plugin): ...'." },
+    { "text": "Choose the scope from the actual area touched: the Discuz plugin id/name, or modules like source/plugin, template, static, install, hooks, admin, or db schema." },
+    { "text": "After the subject, add one blank line, then a body that explains WHAT changed and especially WHY (motivation, bug symptom, root cause), wrapping prose at ~72 chars." },
+    { "text": "When several distinct changes exist, enumerate them as '-' bullet points in the body, one concrete change per bullet, ordered by importance." },
+    { "text": "Ground every statement in the actual diff; name the specific files, functions, hooks, templates, or settings changed (e.g. plugin.php, source/plugin/<id>/, *.htm templates)." },
+    { "text": "Be specific and concrete; never emit vague filler like 'update code', 'various fixes', 'misc changes', or 'minor tweaks'." },
+    { "text": "For Discuz specifics, call out affected plugin hooks (e.g. global_header, viewthread_*), template edits, language packs, install/upgrade SQL, and admincp settings when relevant." },
+    { "text": "Describe behavior changes in terms of user or admin impact on the forum (e.g. affected board pages, permissions, caches) rather than restating the code line by line." },
+    { "text": "Note any database schema or pre_* table changes and required install.php/upgrade steps so deployers know to run them." },
+    { "text": "Add a footer for breaking changes prefixed with 'BREAKING CHANGE:' explaining the incompatibility and the migration or config step required." },
+    { "text": "Reference related issues or tickets in the footer using 'Refs #123' or 'Closes #123' when the change resolves or relates to one." },
+    { "text": "Use plain factual language in present-tense imperative mood; do not invent changes, features, or issue numbers that are not evidenced by the diff." },
+    { "text": "Keep the message focused on a single logical change; if the diff spans unrelated concerns, summarize the primary one in the subject and cover the rest in clearly separated bullets." }
+  ]
+}
