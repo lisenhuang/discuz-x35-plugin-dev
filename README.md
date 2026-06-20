@@ -1,64 +1,73 @@
-# Discuz! X3.5 Plugin Dev Environment
+# 🧩 Discuz! X3.5 Plugin Dev Environment
 
-A turnkey Docker environment for developing **Discuz! X3.5** plugins with AI assistance.
-The forum boots **already installed** (no setup wizard), the database is **ephemeral**
-(re-seeded every boot), and plugins are authored **directly in the source tree** and indexed below.
+> Boot a fully-installed Discuz! X3.5 forum in Docker — no wizard, ephemeral DB, plugins authored right in the source tree. 🚀
 
-- **Core:** `Discuz_X3.5_SC_UTF8/upload` (release 20260504), baked into the image.
-- **Stack:** PHP 8.1 + Apache (`web`) and MariaDB 10.11 (`db`, in-RAM via tmpfs).
-- **Port:** auto-picked starting at **34728** (`+1` until free) — see `.env`.
-- **Admin login:** `admin` / `admin888`.
+| 🔧 | Value |
+| --- | --- |
+| 🌐 URL | `http://localhost:34728` (auto-picks next free port) |
+| 👤 Admin | `admin` / `admin888` |
+| 🐘 Stack | PHP 8.1 + Apache · MariaDB 10.11 |
+| 📦 Core | `Discuz_X3.5_SC_UTF8/upload` (20260504) |
 
-## Quick start
+## 🏗️ Architecture
 
-```bash
-# First time only — create the seed (one-time install, then snapshot):
-make build          # build the web image
-make bootstrap      # start in installer mode
-make install        # auto-run the Discuz installer (no browser)
-make seed           # snapshot DB + config into ./seed  (commit this)
-make restart        # boot from the seed -> turnkey
-
-# Everyday:
-make up             # start; prints http://localhost:<port>
-make down           # stop (DB wiped; seed reloads next time)
+```
+                 make up
+                    │
+        ┌───────────┴───────────┐
+        ▼                        ▼
+┌────────────────┐      ┌──────────────────┐
+│  web 🐘         │      │  db 🗄️           │
+│  php8.1+apache │◄────►│  mariadb (tmpfs)  │
+│  Discuz baked  │      │  RAM-only, wiped  │
+│  into image    │      │  & re-seeded/boot │
+└───────┬────────┘      └─────────▲────────┘
+        │ live mount (ro)         │ auto-load on boot
+        ▼                         │
+ source/plugin/<id>         seed/db/01-discuz.sql
+ template/.../plugin/<id>   seed/config/* + install.lock
+        ▲                         ▲
+        └──── your repo (committed) ──┘
 ```
 
-## Commands
+## ⚡ Quick start
 
-| Command | What it does |
+| Step | Command | When |
+| --- | --- | --- |
+| ▶️ Start | `make up` | daily |
+| ⏹️ Stop | `make down` | daily |
+| 🌱 Build the seed | `make build && make bootstrap && make install && make seed && make restart` | once |
+
+## 🛠️ Commands
+
+| Command | 🧰 Does |
 | --- | --- |
-| `make up` / `make down` | start (free port) / stop the stack |
-| `make reset` | wipe & recreate (re-seed DB) |
-| `make build` / `make rebuild` | build / rebuild the web image |
-| `make logs` / `make shell` / `make ps` | logs / shell into web / status |
-| `make bootstrap` + `make install` + `make seed` | one-time: create the turnkey seed |
-| `make new-plugin id=<id>` | scaffold a plugin in the source tree |
-| `make enable-plugin id=<id>` | best-effort zero-click register+enable |
-| `make list-plugins` | regenerate the Plugins table below |
+| `make up` / `make down` | start (free port) / stop |
+| `make reset` | wipe + recreate (re-seed) |
+| `make logs` / `make shell` / `make ps` | logs / shell / status |
+| `make new-plugin id=<id>` | 🆕 scaffold a plugin |
+| `make enable-plugin id=<id>` | ✅ register + enable |
+| `make list-plugins` | 🔄 refresh table below |
+| `make seed` | 💾 bake current state into seed |
 
-## Plugin workflow
+## 🔌 Plugin flow
 
-1. `make new-plugin id=myplugin` → creates
-   `Discuz_X3.5_SC_UTF8/upload/source/plugin/myplugin/` (+ template dir). Edit with AI.
-2. Files are **bind-mounted live**, so changes show up while the stack runs (PHP is live;
-   for `.htm` template changes, clear the template cache in Admin CP).
-3. `make enable-plugin id=myplugin` (or Admin CP → Apps → Plugins → import
-   `discuz_plugin_myplugin.xml` → Enable).
-4. To make it **pre-installed on every boot**, run `make seed` again and commit.
+```
+make new-plugin id=foo ─► edit source/plugin/foo/ ─► make enable-plugin id=foo ─► 🌐 live
+                          (bind-mounted, no rebuild)                  └─ make seed = permanent
+```
 
-## Notes
+> ⚠️ `id` = lowercase letters/digits/`_` only (no hyphens — the hook class is `plugin_<id>`).
 
-- **Ephemeral by design:** the DB and uploaded files do not persist. Only the source tree,
-  `./seed`, and your plugins are version-controlled.
-- **Licensing:** Discuz! X3.5 is proprietary (free for non-commercial use; keep the
-  "Powered by Discuz" footer). Committing the core is fine for a **private** repo. If this repo
-  goes **public**, uncomment the distro line in `.gitignore` and `git rm -r --cached Discuz_X3.5_SC_UTF8`.
-
-## Plugins
+## 📋 Plugins
 
 <!-- PLUGINS:START -->
 | ID | Name | Description | Path |
 | --- | --- | --- | --- |
 | `helloworld` | Hello World | Example plugin: shows a footer banner on every page. | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
 <!-- PLUGINS:END -->
+
+## ⚖️ Notes
+
+- 🔁 **Ephemeral:** DB + uploads don't persist; only the source tree & `seed/` are committed.
+- 📜 **License:** Discuz! X3.5 is proprietary (free non-commercial; keep the *Powered by Discuz* footer). Public repo → uncomment the distro line in `.gitignore`.

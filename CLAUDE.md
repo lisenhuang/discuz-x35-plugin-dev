@@ -3,6 +3,9 @@
 This repo is a Docker-based **Discuz! X3.5 plugin development environment**. Read this before
 authoring plugins or changing infrastructure.
 
+> 🛑 **Never `git commit` automatically.** Make changes and leave them staged/unstaged; only commit
+> when the user explicitly asks.
+
 ## What runs where
 - **Core (do not edit casually):** `Discuz_X3.5_SC_UTF8/upload/` is the Discuz web root, baked
   into the `web` image at build (`Dockerfile`: `COPY .../upload → /var/www/html`).
