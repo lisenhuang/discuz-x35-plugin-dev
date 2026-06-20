@@ -9,11 +9,15 @@ README="README.md"
 START="<!-- PLUGINS:START -->"
 END="<!-- PLUGINS:END -->"
 
+# Discuz's bundled/built-in plugins — not listed (only your own plugins appear).
+BUILTINS="mobile myrepeats qqconnect witframe_api botaccess"
+
 cdata() { grep -o "<item id=\"$2\"><!\[CDATA\[[^]]*" "$1" 2>/dev/null | head -1 | sed 's/.*CDATA\[//'; }
 
 rows=""
 for d in "$SRC"/*/; do
   id="$(basename "$d")"
+  case " $BUILTINS " in *" $id "*) continue ;; esac
   xml="${d}discuz_plugin_${id}.xml"
   [ -f "$xml" ] || continue
   name="$(cdata "$xml" name)";        [ -z "$name" ] && name="$id"

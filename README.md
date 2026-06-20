@@ -61,8 +61,4 @@ make down           # stop (DB wiped; seed reloads next time)
 | ID | Name | Description | Path |
 | --- | --- | --- | --- |
 | `helloworld` | Hello World | Example plugin: shows a footer banner on every page. | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
-| `mobile` | 掌上论坛 |  | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/mobile/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/mobile/) |
-| `myrepeats` | 我的马甲 |  | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/myrepeats/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/myrepeats/) |
-| `qqconnect` | QQ互联 |  | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/qqconnect/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/qqconnect/) |
-| `witframe_api` | WitFrame API |  | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/witframe_api/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/witframe_api/) |
 <!-- PLUGINS:END -->
