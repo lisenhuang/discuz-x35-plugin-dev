@@ -33,6 +33,10 @@ if [ -f /seed/config/config_global.php ]; then
   if [ -f /seed/config/install.lock ]; then cp -f /seed/config/install.lock "$ROOT/data/install.lock"; else : > "$ROOT/data/install.lock"; fi
   chown -R www-data:www-data "$ROOT/config" "$ROOT/uc_server/data" 2>/dev/null || true
   echo "[entrypoint] seed config injected -> TURNKEY (installer skipped)"
+  # data/ is ephemeral, so rebuild the style/CSS cache now (Discuz won't regenerate
+  # data/cache/style_*.css on a normal request -> pages would load unstyled otherwise).
+  php /usr/local/bin/build-cache.php 2>/dev/null && echo "[entrypoint] CSS/style cache rebuilt" || echo "[entrypoint] build-cache skipped/failed (non-fatal)"
+  chown -R www-data:www-data "$ROOT/data" 2>/dev/null || true
 else
   echo "[entrypoint] no seed config -> INSTALLER MODE (open /install/ in the browser)"
 fi

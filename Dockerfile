@@ -29,6 +29,7 @@ RUN { \
 # Bake the Discuz core (web root = distro's upload/) into the image — ephemeral at runtime.
 COPY Discuz_X3.5_SC_UTF8/upload/ /var/www/html/
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY scripts/build-cache.php /usr/local/bin/build-cache.php
 RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R www-data:www-data /var/www/html
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
