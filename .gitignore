@@ -52,3 +52,10 @@ data/attachment/
 config/config_global.php
 config/config_ucenter.php
 uc_server/data/
+
+# --- PUBLIC-REPO TOGGLE -------------------------------------------------------
+# Discuz! X3.5 is proprietary (free for non-commercial use; keep the "Powered by
+# Discuz" footer; redistribution is restricted). Committing the core is fine for a
+# PRIVATE repo. If this repo becomes PUBLIC, UNCOMMENT the next line and run:
+#     git rm -r --cached Discuz_X3.5_SC_UTF8
+#Discuz_X3.5_SC_UTF8/

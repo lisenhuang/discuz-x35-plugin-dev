@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Regenerate the "Plugins" table in README.md from each plugin's discuz_plugin_<id>.xml.
+# The table is written between the <!-- PLUGINS:START --> / <!-- PLUGINS:END --> markers.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+SRC="Discuz_X3.5_SC_UTF8/upload/source/plugin"
+README="README.md"
+START="<!-- PLUGINS:START -->"
+END="<!-- PLUGINS:END -->"
+
+cdata() { grep -o "<item id=\"$2\"><!\[CDATA\[[^]]*" "$1" 2>/dev/null | head -1 | sed 's/.*CDATA\[//'; }
+
+rows=""
+for d in "$SRC"/*/; do
+  id="$(basename "$d")"
+  xml="${d}discuz_plugin_${id}.xml"
+  [ -f "$xml" ] || continue
+  name="$(cdata "$xml" name)";        [ -z "$name" ] && name="$id"
+  desc="$(cdata "$xml" description)"
+  rel="${SRC}/${id}/"
+  rows+="| \`${id}\` | ${name} | ${desc} | [\`${rel}\`](${rel}) |"$'\n'
+done
+[ -z "$rows" ] && rows="| _(none yet)_ |  |  |  |"$'\n'
+
+tmp="$(mktemp)"
+{
+  echo "$START"
+  echo "| ID | Name | Description | Path |"
+  echo "| --- | --- | --- | --- |"
+  printf '%s' "$rows"
+  echo "$END"
+} > "$tmp"
+
+if [ -f "$README" ] && grep -qF "$START" "$README"; then
+  awk -v s="$START" -v e="$END" -v f="$tmp" '
+    index($0,s){ while((getline line < f)>0) print line; skip=1; next }
+    index($0,e){ skip=0; next }
+    skip!=1 { print }
+  ' "$README" > "$README.new" && mv "$README.new" "$README"
+else
+  { echo; echo "## Plugins"; echo; cat "$tmp"; } >> "$README"
+fi
+rm -f "$tmp"
+echo "Updated $README plugins table."

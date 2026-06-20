@@ -1,0 +1,42 @@
+name: dz35plugin
+
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: discuz
+      MARIADB_USER: discuz
+      MARIADB_PASSWORD: discuz
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    # Ephemeral DB: lives in RAM, wiped on `down`, re-seeded from ./seed/db on every fresh boot
+    tmpfs:
+      - /var/lib/mysql
+    volumes:
+      - ./seed/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DZ_DB_HOST: db
+    ports:
+      - "${DZ_PORT:-34728}:80"
+    volumes:
+      # Seed config (read-only) — entrypoint injects it for turnkey boot
+      - ./seed:/seed:ro
+      # Live plugin code/templates (read-only) — edit on host, effective in container without rebuild
+      - ./Discuz_X3.5_SC_UTF8/upload/source/plugin:/var/www/html/source/plugin:ro
+      - ./Discuz_X3.5_SC_UTF8/upload/template/default/plugin:/var/www/html/template/default/plugin:ro

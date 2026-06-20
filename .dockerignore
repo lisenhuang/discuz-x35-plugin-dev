@@ -1,0 +1,18 @@
+# Keep the Docker build context small. Only Discuz_X3.5_SC_UTF8/upload + scripts/ are needed.
+.git
+.gitignore
+.env
+.vscode
+.DS_Store
+**/.DS_Store
+seed/
+*.md
+Makefile
+
+# From the distro, we only COPY upload/ — skip the rest
+Discuz_X3.5_SC_UTF8/readme/
+Discuz_X3.5_SC_UTF8/readme.html
+Discuz_X3.5_SC_UTF8/utility/
+Discuz_X3.5_SC_UTF8/utility.html
+Discuz_X3.5_SC_UTF8/LICENSE
+Discuz_X3.5_SC_UTF8/qqqun.png
