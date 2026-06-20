@@ -32,6 +32,9 @@ services:
         condition: service_healthy
     environment:
       DZ_DB_HOST: db
+      # Exposed port — build-cache.php bakes it into the absolute url()s in the cached
+      # CSS so the icon font + backgrounds resolve at http://localhost:<port>/.
+      DZ_PORT: ${DZ_PORT:-34728}
     ports:
       - "${DZ_PORT:-34728}:80"
     volumes:
