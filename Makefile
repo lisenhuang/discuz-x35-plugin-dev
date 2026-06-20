@@ -38,10 +38,16 @@ logs: ## Follow container logs
 ps: ## Show container status
 	@$(COMPOSE) ps
 
-bootstrap: ## First-time setup: start with an EMPTY seed (installer mode)
+bootstrap: ## First-time setup: start the stack (installer mode if no seed yet)
 	@bash scripts/pick-port.sh >/dev/null
 	@$(COMPOSE) up -d
-	@p=$$(grep -E '^DZ_PORT=' .env | cut -d= -f2); echo; echo "  Installer: http://localhost:$$p/install/   (or run: make install)"; echo
+	@p=$$(grep -E '^DZ_PORT=' .env | cut -d= -f2); echo; \
+	 if [ -f seed/config/config_global.php ]; then \
+	   echo "  Already seeded (turnkey). Forum: http://localhost:$$p   admin: admin/admin888"; \
+	   echo "  (No install needed. To rebuild the seed: rm -rf seed/db/* seed/config/* && make reset && make install && make seed)"; \
+	 else \
+	   echo "  Installer: http://localhost:$$p/install/   (or run: make install)"; \
+	 fi; echo
 
 install: ## Auto-run the Discuz installer once (no browser needed)
 	@bash scripts/auto-install.sh

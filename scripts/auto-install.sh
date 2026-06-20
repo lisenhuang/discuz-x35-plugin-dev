@@ -15,16 +15,18 @@ trap 'rm -f "$JAR"' EXIT
 DBHOST=db DBNAME=discuz DBUSER=discuz DBPW=discuz TABLEPRE=pre_
 ADMIN_USER=admin ADMIN_PASS=admin888 ADMIN_EMAIL=admin@admin.com
 
+# Idempotent: if a seed is already in place, the forum is installed -> nothing to do.
+if docker compose exec -T web test -f /var/www/html/data/install.lock 2>/dev/null; then
+  echo "[auto-install] already installed (install.lock present) — skipping."
+  echo "[auto-install] Forum: http://localhost:${PORT}/   admin: ${ADMIN_USER}/${ADMIN_PASS}"
+  exit 0
+fi
+
 echo "[auto-install] waiting for installer at $BASE ..."
 for i in $(seq 1 60); do
   if curl -fsS -o /dev/null "http://localhost:${PORT}/install/" 2>/dev/null; then break; fi
   sleep 2
 done
-
-# Already installed?
-if curl -fsS "http://localhost:${PORT}/forum.php" 2>/dev/null | grep -qiE 'discuz_uid|Powered by|寮哄埗|portal'; then
-  if ! curl -fsS "http://localhost:${PORT}/install/" 2>/dev/null | grep -qi 'install'; then :; fi
-fi
 
 echo "[auto-install] step 1/5: db_init (writes config_global.php, returns allinfo)"
 RESP="$(curl -fsS -c "$JAR" -b "$JAR" "$BASE" \
