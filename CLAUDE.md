@@ -29,7 +29,9 @@ authoring plugins or changing infrastructure.
 3. Enable: `make enable-plugin id=<id>` (best-effort, via `scripts/import-plugin.php`). If it
    doesn't take, enable in Admin CP → Apps → Plugins → import `discuz_plugin_<id>.xml` → Enable.
 4. Persist: `make seed` bakes the now-installed plugin into the seed so it's pre-installed on boot.
-5. Index: `make list-plugins` refreshes the Plugins table in `README.md`.
+5. Docs: every plugin gets a guide at `docs/plugins/<id>.md` (scaffolded by `new-plugin.sh`) —
+   fill in its **Install** and **Use** sections. Then `make list-plugins` refreshes the Plugins table
+   in `README.md` (it links each plugin to its `docs/plugins/<id>.md`).
 
 ## Conventions & gotchas
 - Plugin `<id>`: lowercase letters/digits/underscore. The class must be `plugin_<id>` in

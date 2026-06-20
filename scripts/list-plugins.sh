@@ -23,15 +23,17 @@ for d in "$SRC"/*/; do
   name="$(cdata "$xml" name)";        [ -z "$name" ] && name="$id"
   desc="$(cdata "$xml" description)"
   rel="${SRC}/${id}/"
-  rows+="| \`${id}\` | ${name} | ${desc} | [\`${rel}\`](${rel}) |"$'\n'
+  doc="docs/plugins/${id}.md"
+  doccell="—"; [ -f "$doc" ] && doccell="[📖 guide](${doc})"
+  rows+="| \`${id}\` | ${name} | ${doccell} | ${desc} | [\`${rel}\`](${rel}) |"$'\n'
 done
-[ -z "$rows" ] && rows="| _(none yet)_ |  |  |  |"$'\n'
+[ -z "$rows" ] && rows="| _(none yet)_ |  |  |  |  |"$'\n'
 
 tmp="$(mktemp)"
 {
   echo "$START"
-  echo "| ID | Name | Description | Path |"
-  echo "| --- | --- | --- | --- |"
+  echo "| ID | Name | Docs | Description | Path |"
+  echo "| --- | --- | --- | --- | --- |"
   printf '%s' "$rows"
   echo "$END"
 } > "$tmp"

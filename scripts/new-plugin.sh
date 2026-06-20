@@ -109,17 +109,42 @@ XML
 
 printf '' > "$TPL/index.htm"
 
-cat > "$SRC/README.md" <<MD
+mkdir -p docs/plugins
+cat > "docs/plugins/$ID.md" <<MD
 # $NAME (\`$ID\`)
 
 $DESC
 
-- Code: \`source/plugin/$ID/\`
-- Templates: \`template/default/plugin/$ID/\`
-- Enable: \`make enable-plugin id=$ID\` (or Admin CP > Apps > Plugins > import \`discuz_plugin_$ID.xml\` > Enable)
+| | |
+| --- | --- |
+| 🆔 Identifier | \`$ID\` |
+| 🧰 Requires | Discuz! X3.5 |
+| 📁 Files | \`source/plugin/$ID/\` |
+
+## 📥 Install on your own Discuz! forum
+
+1. Copy the plugin folder into your forum, keeping the same path:
+   \`\`\`
+   source/plugin/$ID/   →   <your-forum>/source/plugin/$ID/
+   \`\`\`
+   (also copy \`template/default/plugin/$ID/\` if this plugin ships templates)
+2. **Admin CP (管理中心) → 应用 Apps → 插件 Plugins** → find \`$ID\` → **安装 Install → 启用 Enable**.
+   *(Alternative: 导入 Import \`discuz_plugin_$ID.xml\`.)*
+
+## ▶️ Use
+
+TODO: describe what users see and how to use **$NAME**.
+
+## 🗑️ Uninstall
+
+Admin CP → 应用 → 插件 → **卸载 Uninstall**, then delete \`source/plugin/$ID/\`.
+
+---
+<sub>Developing in this repo? Shortcut install: \`make enable-plugin id=$ID\`.</sub>
 MD
 
-echo "Scaffolded plugin '$ID' at:"
-echo "  $SRC"
-echo "  $TPL"
+echo "Scaffolded plugin '$ID':"
+echo "  code: $SRC"
+echo "  tpl:  $TPL"
+echo "  docs: docs/plugins/$ID.md   (fill in the Use section)"
 echo "Next: make enable-plugin id=$ID   (then 'make list-plugins' to update README)"
