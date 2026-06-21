@@ -29,6 +29,33 @@ email** — plus a one-click **register link that auto-fills the code**. Codes a
 3. **Turn on invite-code registration** (so codes are actually required):
    **Admin CP → 用户 / UCenter → 注册访问控制** → 允许注册 = **邀请码注册 / Invite code** (`regstatus=2`).
 
+## 🔄 Upgrade (already installed an earlier version?)
+
+Upgrading is **safe and keeps all your settings, orders, and issued codes** — you don't uninstall and
+you don't re-enter your keys. Steps:
+
+1. **Back up first** (good practice): export your DB, or at least note your Stripe keys.
+2. **Overwrite the files** with the new version, same path — replace the whole folder:
+   ```
+   source/plugin/buycode/   →   <your-forum>/source/plugin/buycode/
+   ```
+   PHP changes take effect immediately. (This plugin ships **no templates**, so there's nothing to
+   re-cache; if a future version adds any, also run **Admin CP → 工具 Tools → 更新缓存 / Update cache**.)
+3. **Re-import the manifest** to pick up the new version and any new settings/menus:
+   **Admin CP → 应用 Apps → 插件 Plugins → 导入 / Import `discuz_plugin_buycode.xml`**.
+   - This **does not** wipe your config: `install.php` is idempotent — it **backfills only new settings
+     keys** (e.g. the new **Contact email**) with their defaults and **preserves every value you already
+     set** (keys, price, webhooks, base URLs). Your `pre_buycode_order` table is left untouched
+     (`CREATE TABLE IF NOT EXISTS`), and `pre_common_invite` codes are never touched.
+   - **Do NOT click 卸载 / Uninstall** — that drops `pre_buycode_order` (your order history). Upgrading
+     never requires uninstalling.
+4. New settings show up empty/at default — review the **Settings** page and fill in anything new
+   (e.g. **联系邮箱 / Contact email**). That's it.
+
+> 🧪 **This dev repo:** the plugin folder is the live source (bind-mounted), so new code is already
+> "installed" — just re-run `make enable-plugin id=buycode` (it updates the version/modules and re-runs
+> the idempotent `install.php`), then `make seed` if you want the upgrade baked into the boot seed.
+
 ## ⚙️ Configure (Admin CP → Apps → Plugins → Buy Invite Code (Stripe) → Settings)
 
 | Field | What to enter |
