@@ -240,6 +240,10 @@ function buycode_mail($to, $codes, $redirect_url, $env) {
 		.'<p style="margin-top:16px">点击下面的链接立即注册（邀请码会自动填入注册页面）：</p>'
 		.'<p><a href="'.$reglink.'">'.$reglink.'</a></p>'
 		.'<p style="color:#888;font-size:13px">每个邀请码仅可使用一次。</p>';
+	// plugin.php (webhook/return context) does not load the mail library — pull it in before sending.
+	if(!function_exists('sendmail')) {
+		require_once libfile('function/mail');
+	}
 	return sendmail($to, $subject, $message);
 }
 

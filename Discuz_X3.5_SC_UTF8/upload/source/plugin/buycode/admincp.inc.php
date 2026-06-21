@@ -37,7 +37,7 @@ if(submitcheck('bcsubmit_shared')) {
 	$raw['max_qty']       = max(1, min(999, intval(getgpc('max_qty'))));
 	$raw['code_length']   = max(4, min(20, intval(getgpc('code_length'))));
 	$raw['expiry_days']   = max(0, intval(getgpc('expiry_days')));
-	$raw['redirect_url']  = trim((string)getgpc('redirect_url')) ?: 'member.php?mod=register';
+	// redirect_url is fixed (not user-editable) — leave the stored value untouched.
 	C::t('common_setting')->update_setting('buycode', $raw);
 	updatecache('setting');
 	cpmsg('通用设置已保存 / Shared settings saved.', $cpu('shared'), 'succeed');
@@ -131,6 +131,18 @@ $render_env_tab = function($env, $label) use ($cfg, $e, $onoff, $selfurl) {
 
 	$secset = $cfg[$env.'_webhook_secret'] !== '';
 
+	// Eye-catching warning when the webhook isn't set up (no endpoint AND no signing secret):
+	// without it Stripe can't confirm payments and buyers may not receive their codes.
+	if(!$whid && !$secset) {
+		echo '<div style="background:#fff0f0;border:3px solid #e53e3e;border-radius:12px;padding:16px 18px;margin:14px 0;color:#9b1c1c;line-height:1.7;box-shadow:0 2px 10px rgba(229,62,62,.25)">'
+			.'<div style="font-size:20px;font-weight:800;margin-bottom:6px">🚨 Webhook 尚未设置！/ Webhook NOT set up!</div>'
+			.'<div style="font-size:14px">此环境（<b>'.$e($label).'</b>）的 Webhook <b>未注册</b>，签名密钥也<b>未配置</b>。'
+			.'这样 Stripe <b>无法通知支付结果</b>，买家付款后可能<b style="color:#c00">收不到邀请码</b>！<br />'
+			.'👉 请在下方「Webhook（自动）」填写域名并点击 <b>自动注册</b> 即可一键完成。<br />'
+			.'<span style="color:#a33">This environment has no webhook and no signing secret — Stripe can\'t confirm payments and buyers may not get their codes. Fill the Domain below and click <b>Auto-register</b>.</span>'
+			.'</div></div>';
+	}
+
 	// settings form (enable + secret key only — the webhook signing secret is handled automatically below)
 	showtableheader($label.' — 基本设置 / settings');
 	showformheader($selfurl, '', 'bc'.$env);
@@ -209,7 +221,7 @@ if($tab === 'test') {
 	showtablerow('', '', '每单最大数量 / Max qty per order：<input type="text" name="max_qty" value="'.$e($cfg['max_qty']).'" class="txt" style="width:100px" />');
 	showtablerow('', '', '邀请码长度 / Code length：<input type="text" name="code_length" value="'.$e($cfg['code_length']).'" class="txt" style="width:100px" /> <span class="smalltxt">(默认 6；排除 I/O/0/1)</span>');
 	showtablerow('', '', '邀请码有效期(天) / Code expiry days：<input type="text" name="expiry_days" value="'.$e($cfg['expiry_days']).'" class="txt" style="width:100px" /> <span class="smalltxt">(0 = 永久 never)</span>');
-	showtablerow('', '', '支付后跳转地址 / Post-payment redirect URL：<br /><input type="text" name="redirect_url" value="'.$e($cfg['redirect_url']).'" class="txt" style="width:440px" /><br /><span class="smalltxt">默认注册页；邀请码会自动附加为 &amp;invitecode=…，在注册页自动填入。</span>');
+	showtablerow('', '', '支付后跳转地址 / Post-payment redirect：<br /><code>'.$e($cfg['redirect_url']).'</code><br /><span class="smalltxt">固定为注册页（不可修改）；支付成功后买家点击「立即注册」会带上邀请码自动填入。/ Fixed to the registration page (not editable).</span>');
 	showsubmit('bcsubmit_shared', '保存 / Save');
 	showtablefooter();
 	showformfooter();
