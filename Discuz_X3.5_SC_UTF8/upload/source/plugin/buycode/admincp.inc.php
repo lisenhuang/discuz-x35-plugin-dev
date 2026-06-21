@@ -15,25 +15,28 @@ require_once DISCUZ_ROOT.'./source/plugin/buycode/function_buycode.php';
 $selfurl = 'plugins&operation=config&do='.$pluginid.'&identifier=buycode&pmod=admincp';
 $cpu = function($t) use ($selfurl) { return 'action='.$selfurl.'&bctab='.$t; }; // cpmsg target for a tab
 
-// --- save: TEST tab -----------------------------------------------------------
-if(submitcheck('bcsubmit_test')) {
+// --- save: TEST / LIVE basic settings (enable + secret key; webhook secret is managed separately) ---
+foreach(array('test', 'live') as $senv) {
+	if(!submitcheck('bcsubmit_'.$senv)) {
+		continue;
+	}
 	$raw = (array)dunserialize(C::t('common_setting')->fetch_setting('buycode'));
-	$raw['test_enabled']        = intval(getgpc('test_enabled'));
-	$raw['test_secret_key']     = trim((string)getgpc('test_secret_key'));
-	$raw['test_webhook_secret'] = trim((string)getgpc('test_webhook_secret'));
+	$raw[$senv.'_enabled']    = intval(getgpc($senv.'_enabled'));
+	$raw[$senv.'_secret_key'] = trim((string)getgpc($senv.'_secret_key'));
 	C::t('common_setting')->update_setting('buycode', $raw);
 	updatecache('setting');
-	cpmsg('测试设置已保存 / Test settings saved.', $cpu('test'), 'succeed');
+	cpmsg(($senv === 'test' ? '测试' : '正式').'设置已保存 / Settings saved.', $cpu($senv), 'succeed');
 }
-// --- save: LIVE tab -----------------------------------------------------------
-if(submitcheck('bcsubmit_live')) {
+// --- save: manual webhook signing secret (only for the Dashboard-managed path) ----------------------
+foreach(array('test', 'live') as $senv) {
+	if(!submitcheck('setsecret_'.$senv)) {
+		continue;
+	}
 	$raw = (array)dunserialize(C::t('common_setting')->fetch_setting('buycode'));
-	$raw['live_enabled']        = intval(getgpc('live_enabled'));
-	$raw['live_secret_key']     = trim((string)getgpc('live_secret_key'));
-	$raw['live_webhook_secret'] = trim((string)getgpc('live_webhook_secret'));
+	$raw[$senv.'_webhook_secret'] = trim((string)getgpc($senv.'_webhook_secret'));
 	C::t('common_setting')->update_setting('buycode', $raw);
 	updatecache('setting');
-	cpmsg('正式设置已保存 / Live settings saved.', $cpu('live'), 'succeed');
+	cpmsg('签名密钥已保存 / Signing secret saved.', $cpu($senv), 'succeed');
 }
 // --- save: SHARED tab ---------------------------------------------------------
 if(submitcheck('bcsubmit_shared')) {
@@ -132,27 +135,40 @@ $render_env_tab = function($env, $label) use ($cfg, $e, $onoff, $selfurl) {
 	$whid    = $cfg[$env.'_webhook_id'];
 	$ph      = $env === 'test' ? 'https://xxx.trycloudflare.com' : 'https://your-forum.com';
 	$skhint  = $env === 'test' ? 'sk_test_…' : 'sk_live_…';
+	$keyurl  = $env === 'test' ? 'https://dashboard.stripe.com/test/apikeys' : 'https://dashboard.stripe.com/apikeys';
+	$keylink = ' &nbsp;<a href="'.$keyurl.'" target="_blank" rel="noopener">获取密钥 / Get from Stripe ↗</a>';
 
-	// settings form
+	$secset = $cfg[$env.'_webhook_secret'] !== '';
+
+	// settings form (enable + secret key only — the webhook signing secret is handled automatically below)
 	showtableheader($label.' — 基本设置 / settings');
 	showformheader($selfurl, '', 'bc'.$env);
 	showtablerow('', '', '启用 / Enabled：'.$onoff($env.'_enabled', $cfg[$env.'_enabled']));
-	showtablerow('', '', '密钥 / Secret key <span class="smalltxt">('.$skhint.')</span>：<br /><input type="text" name="'.$env.'_secret_key" value="'.$e($cfg[$env.'_secret_key']).'" class="txt" style="width:440px" />');
-	showtablerow('', '', 'Webhook 签名密钥 / Webhook secret <span class="smalltxt">(whsec_… — 自动注册会自动填写)</span>：<br /><input type="text" name="'.$env.'_webhook_secret" value="'.$e($cfg[$env.'_webhook_secret']).'" class="txt" style="width:440px" />');
+	showtablerow('', '', '密钥 / Secret key <span class="smalltxt">('.$skhint.')</span>'.$keylink.'：<br /><input type="text" name="'.$env.'_secret_key" value="'.$e($cfg[$env.'_secret_key']).'" class="txt" style="width:440px" />');
 	showsubmit('bcsubmit_'.$env, '保存 / Save');
 	showtablefooter();
 	showformfooter();
 
-	// auto-register webhook
-	showtableheader($label.' — Webhook 自动注册 / auto-register');
+	// auto-register webhook (handles the signing secret for you — no need to see or type it)
+	showtableheader($label.' — Webhook（自动）/ auto-register');
 	showformheader($selfurl, '', 'reg'.$env);
 	showtablerow('', '', 'Webhook 域名 / Domain：<input type="text" name="'.$env.'_base" value="'.$e($prefill).'" class="txt" style="width:380px" placeholder="'.$ph.'" /><br /><span class="smalltxt">'
 		.($env === 'test'
 			? '本地开发：填用 Cloudflare Tunnel 解析到本机的 https 域名。'
 			: '正式：填你的真实站点域名；若已用真实域名访问后台可留空自动识别。')
-		.'点击注册会用此域名创建/更新 Webhook，并保存为该环境基础地址（其支付跳转、注册链接也会使用）。/ Saved as this env\'s base URL.</span>');
-	showtablerow('', '', '目标 / Target：<code>'.$e($whurl).'</code><br />状态 / Status：'.($whid ? '✅ 已注册 registered（<code>'.$e($whid).'</code>）' : '⚪ 未注册 not registered'));
+		.'点击注册会用此域名创建/更新 Webhook，并<b>自动保存签名密钥</b>（你无需查看或填写）。/ The signing secret is fetched &amp; stored automatically.</span>');
+	showtablerow('', '', '目标 / Target：<code>'.$e($whurl).'</code>');
+	showtablerow('', '', '状态 / Status：'.($whid ? '✅ 已注册 registered' : '⚪ 未注册 not registered')
+		.' &nbsp;|&nbsp; 签名密钥 / Signing secret：'.($secset ? '✅ 已自动配置 auto-configured' : '⚪ 未配置 not set'));
 	showsubmit('regwebhook_'.$env, '自动注册 / 更新 Webhook');
+	showtablefooter();
+	showformfooter();
+
+	// optional manual entry — only for people who created the webhook themselves in the Stripe Dashboard
+	showtableheader($label.' — 手动填写签名密钥（可选）/ manual signing secret (optional)');
+	showformheader($selfurl, '', 'sec'.$env);
+	showtablerow('', '', '<span class="smalltxt">大多数人不需要这一步。只有当你<b>在 Stripe 后台手动创建 Webhook</b>（而非上面的自动注册）时，才需要把签名密钥粘贴到这里。/ Most people can ignore this — only needed if you created the webhook manually in the Stripe Dashboard.</span><br /><input type="text" name="'.$env.'_webhook_secret" value="" class="txt" style="width:380px" placeholder="whsec_…" autocomplete="off" />');
+	showsubmit('setsecret_'.$env, '保存密钥 / Save secret');
 	showtablefooter();
 	showformfooter();
 
