@@ -38,6 +38,7 @@ email** — plus a one-click **register link that auto-fills the code**. Codes a
 | **Test / Live webhook secret** | the signing secret (`whsec_…`) — **auto-filled** by Auto-register below |
 | **Unit amount** | price in the **smallest currency unit** (e.g. `500` = $5.00); **Currency** e.g. `usd` |
 | **Product label** | shown on the buy/checkout page (e.g. `论坛邀请码`) |
+| **Contact email** | shown on the buy page (and on the success/processing pages) as a `mailto:` link so buyers can reach you if anything goes wrong; leave blank to hide |
 | **Max qty per order** | upper bound on the quantity selector |
 | **Code length** | default `6` (alphabet excludes look-alikes `I O 0 1`) |
 | **Code expiry days** | `0` = never |

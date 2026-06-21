@@ -42,6 +42,7 @@ if(!C::t('common_setting')->fetch_setting('buycode')) {
 		'code_length'         => 6,
 		'expiry_days'         => 0,
 		'redirect_url'        => 'member.php?mod=register',
+		'contact_email'       => '',
 	);
 	C::t('common_setting')->update_setting('buycode', $defaults);
 	if(!function_exists('updatecache')) {

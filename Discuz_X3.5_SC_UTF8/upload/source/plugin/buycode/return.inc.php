@@ -15,7 +15,8 @@ if($sessionid === '') {
 	$base = buycode_base_url(buycode_env());
 	buycode_render_page('未找到订单',
 		'<h1>未找到订单</h1><p class="muted">缺少订单信息。</p>'
-		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode'.buycode_env_qs(buycode_env()).'">返回购买页</a>');
+		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode'.buycode_env_qs(buycode_env()).'">返回购买页</a>'
+		.buycode_contact_html($cfg));
 }
 
 // No pending order exists (we only record paid orders) — env comes from the return URL (&env=…).
@@ -44,11 +45,13 @@ if($codes) {
 		.'<p class="muted">以下是您的邀请码（已发送至您的邮箱）：</p>'
 		.$codehtml
 		.'<a class="btn" href="'.htmlspecialchars($reglink, ENT_QUOTES).'">立即注册 →</a>'
-		.'<p class="muted" style="margin-top:12px">点击上面的按钮，邀请码将自动填入注册页面。每个邀请码仅可使用一次。</p>';
+		.'<p class="muted" style="margin-top:12px">点击上面的按钮，邀请码将自动填入注册页面。每个邀请码仅可使用一次。</p>'
+		.buycode_contact_html($cfg);
 	buycode_render_page('支付成功', $html);
 } else {
 	$html = '<h1>正在确认支付…</h1>'
 		.'<p class="muted">您的支付正在处理中，邀请码生成后会立即发送到您的邮箱，请稍后查收。</p>'
-		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode:return'.buycode_env_qs($env).'&session_id='.rawurlencode($sessionid).'">刷新查看</a>';
+		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode:return'.buycode_env_qs($env).'&session_id='.rawurlencode($sessionid).'">刷新查看</a>'
+		.buycode_contact_html($cfg);
 	buycode_render_page('处理中', $html);
 }

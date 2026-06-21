@@ -15,7 +15,7 @@ $qs     = buycode_env_qs($env);
 $secret = $cfg[$env.'_secret_key'];
 
 if(!$cfg[$env.'_enabled'] || $secret === '') {
-	buycode_render_page('暂未开放', '<h1>邀请码购买暂未开放</h1><p class="muted">请稍后再试，或联系管理员。</p>');
+	buycode_render_page('暂未开放', '<h1>邀请码购买暂未开放</h1><p class="muted">请稍后再试，或联系管理员。</p>'.buycode_contact_html($cfg));
 }
 
 $err   = '';
@@ -71,6 +71,7 @@ $html = '<h1>购买邀请码'.$testtag.'</h1>'
 	.'<input type="email" name="email" required placeholder="you@example.com" value="'.htmlspecialchars($email, ENT_QUOTES).'">'
 	.'<button class="btn" type="submit">立即购买并支付</button>'
 	.'</form>'
-	.'<p class="muted" style="margin-top:14px">支付由 Stripe 安全处理。付款成功后，邀请码会立即显示并发送到您的邮箱。</p>';
+	.'<p class="muted" style="margin-top:14px">支付由 Stripe 安全处理。付款成功后，邀请码会立即显示并发送到您的邮箱。</p>'
+	.buycode_contact_html($cfg);
 
 buycode_render_page('购买邀请码', $html);

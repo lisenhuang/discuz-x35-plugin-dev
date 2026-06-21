@@ -37,6 +37,7 @@ if(submitcheck('bcsubmit_shared')) {
 	$raw['max_qty']       = max(1, min(999, intval(getgpc('max_qty'))));
 	$raw['code_length']   = max(4, min(20, intval(getgpc('code_length'))));
 	$raw['expiry_days']   = max(0, intval(getgpc('expiry_days')));
+	$raw['contact_email'] = trim((string)getgpc('contact_email'));
 	// redirect_url is fixed (not user-editable) — leave the stored value untouched.
 	C::t('common_setting')->update_setting('buycode', $raw);
 	updatecache('setting');
@@ -218,6 +219,7 @@ if($tab === 'test') {
 	showformheader($selfurl, '', 'bcshared');
 	showtablerow('', '', '单价 / Unit amount <span class="smalltxt">(最小货币单位，如美分 — 500 = $5.00)</span>：<input type="text" name="unit_amount" value="'.$e($cfg['unit_amount']).'" class="txt" style="width:100px" /> &nbsp; 货币 / Currency：<input type="text" name="currency" value="'.$e($cfg['currency']).'" class="txt" style="width:70px" /> &nbsp; <span class="smalltxt">当前 = <b>'.$e(buycode_format_price($cfg['unit_amount'], $cfg['currency'])).'</b></span>');
 	showtablerow('', '', '商品名称 / Product label：<input type="text" name="product_label" value="'.$e($cfg['product_label']).'" class="txt" style="width:340px" />');
+		showtablerow('', '', '联系邮箱 / Contact email：<input type="text" name="contact_email" value="'.$e($cfg['contact_email']).'" class="txt" style="width:340px" placeholder="admin@your-forum.com" /> <span class="smalltxt">显示在购买页，买家遇到问题可联系；留空则不显示。/ Shown on the buy page so buyers can reach you; leave blank to hide.</span>');
 	showtablerow('', '', '每单最大数量 / Max qty per order：<input type="text" name="max_qty" value="'.$e($cfg['max_qty']).'" class="txt" style="width:100px" />');
 	showtablerow('', '', '邀请码长度 / Code length：<input type="text" name="code_length" value="'.$e($cfg['code_length']).'" class="txt" style="width:100px" /> <span class="smalltxt">(默认 6；排除 I/O/0/1)</span>');
 	showtablerow('', '', '邀请码有效期(天) / Code expiry days：<input type="text" name="expiry_days" value="'.$e($cfg['expiry_days']).'" class="txt" style="width:100px" /> <span class="smalltxt">(0 = 永久 never)</span>');

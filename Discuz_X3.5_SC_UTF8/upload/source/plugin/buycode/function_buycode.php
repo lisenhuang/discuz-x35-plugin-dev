@@ -38,6 +38,7 @@ function buycode_config() {
 		'code_length'         => 6,
 		'expiry_days'         => 0,     // 0 = never
 		'redirect_url'        => 'member.php?mod=register',
+		'contact_email'       => '',    // shown to buyers so they can reach the admin if anything goes wrong
 	);
 	$cfg = isset($_G['setting']['buycode']) ? $_G['setting']['buycode'] : '';
 	if(is_string($cfg)) {
@@ -99,6 +100,22 @@ function buycode_register_link($redirect_url, $code, $env) {
 	$url = preg_match('#^https?://#i', $redirect_url) ? $redirect_url : $base.'/'.ltrim($redirect_url, '/');
 	$sep = strpos($url, '?') !== false ? '&' : '?';
 	return $url.$sep.'invitecode='.rawurlencode($code);
+}
+
+/**
+ * Small "need help? contact us" line for buyer-facing pages — a mailto: link to the admin's configured
+ * contact email. Returns '' when no contact email is set (so nothing is shown).
+ */
+function buycode_contact_html($cfg = null) {
+	if($cfg === null) {
+		$cfg = buycode_config();
+	}
+	$addr = isset($cfg['contact_email']) ? trim((string)$cfg['contact_email']) : '';
+	if($addr === '') {
+		return '';
+	}
+	$h = htmlspecialchars($addr, ENT_QUOTES);
+	return '<p class="muted" style="margin-top:14px">遇到问题？联系管理员：<a href="mailto:'.$h.'">'.$h.'</a></p>';
 }
 
 /** Human-readable price from a Stripe amount (smallest unit) + currency. */
