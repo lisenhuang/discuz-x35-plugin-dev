@@ -182,36 +182,42 @@ function buycode_make_invites($quantity, $expiry_days, $code_length, $email) {
 }
 
 /**
- * Idempotently fulfill a paid Stripe Checkout session: atomically claim the pending order, issue the
- * codes, email them. Safe to call from both the webhook and the return page (no double-issue). The
- * email's register link is built in the order's own env. Returns the issued codes.
+ * Idempotently fulfill a PAID Stripe Checkout session. We do NOT record pending/unpaid orders (so a
+ * flood of abandoned checkouts can't bloat the DB) — the row is created here, only on payment. The
+ * order's details come from the Stripe session ($session: the session array with id, metadata,
+ * amount_total, currency, customer_details). Concurrency-safe: we atomically claim the session via
+ * INSERT IGNORE on the unique sessionid key, so a simultaneous webhook + return page can't double-issue.
+ * Returns the issued codes.
  */
-function buycode_fulfill($sessionid) {
-	$sessionid = trim($sessionid);
-	if($sessionid === '') {
+function buycode_fulfill($session) {
+	if(empty($session['id'])) {
 		return array();
 	}
-	$tbl = DB::table('buycode_order');
-	$order = DB::fetch_first('SELECT * FROM '.$tbl.' WHERE sessionid=%s', array($sessionid));
-	if(!$order) {
-		return array();
-	}
-	if($order['status'] == 1) {
-		return $order['codes'] !== '' ? explode(',', $order['codes']) : array();
-	}
-	// Atomically claim the order — only one concurrent caller wins this UPDATE.
-	DB::query('UPDATE '.$tbl.' SET status=1, paydateline=%d WHERE orderid=%d AND status=0',
-		array(TIMESTAMP, $order['orderid']));
+	$sid  = $session['id'];
+	$tbl  = DB::table('buycode_order');
+	$meta = (isset($session['metadata']) && is_array($session['metadata'])) ? $session['metadata'] : array();
+	$env  = (isset($meta['env']) && $meta['env'] === 'test') ? 'test' : 'live';
+	$email = isset($meta['email']) && $meta['email'] !== '' ? $meta['email']
+		: (isset($session['customer_details']['email']) ? $session['customer_details']['email'] : '');
+	$qty      = isset($meta['quantity']) ? max(1, intval($meta['quantity'])) : 1;
+	$uid      = isset($meta['uid']) ? intval($meta['uid']) : 0;
+	$amount   = isset($session['amount_total']) ? intval($session['amount_total']) : 0;
+	$currency = isset($session['currency']) ? $session['currency'] : '';
+
+	// Atomically claim this session (unique sessionid). The winner inserts a paid row; losers bail.
+	DB::query('INSERT IGNORE INTO '.$tbl.' (sessionid, uid, email, quantity, amount, currency, codes, mode, status, dateline, paydateline) '
+		.'VALUES (%s, %d, %s, %d, %d, %s, %s, %s, 1, %d, %d)',
+		array($sid, $uid, $email, $qty, $amount, $currency, '', $env, TIMESTAMP, TIMESTAMP), true);
 	if(DB::affected_rows() == 0) {
-		$row = DB::fetch_first('SELECT codes FROM '.$tbl.' WHERE orderid=%d', array($order['orderid']));
+		// Another caller (webhook vs return page) already claimed & is fulfilling it — return its codes.
+		$row = DB::fetch_first('SELECT codes FROM '.$tbl.' WHERE sessionid=%s', array($sid));
 		return ($row && $row['codes'] !== '') ? explode(',', $row['codes']) : array();
 	}
 	$cfg = buycode_config();
-	$env = $order['mode'] === 'live' ? 'live' : 'test';
-	$codes = buycode_make_invites($order['quantity'], $cfg['expiry_days'], $cfg['code_length'], $order['email']);
-	DB::query('UPDATE '.$tbl.' SET codes=%s WHERE orderid=%d', array(implode(',', $codes), $order['orderid']));
+	$codes = buycode_make_invites($qty, $cfg['expiry_days'], $cfg['code_length'], $email);
+	DB::query('UPDATE '.$tbl.' SET codes=%s WHERE sessionid=%s', array(implode(',', $codes), $sid));
 	if($codes) {
-		buycode_mail($order['email'], $codes, $cfg['redirect_url'], $env);
+		buycode_mail($email, $codes, $cfg['redirect_url'], $env);
 	}
 	return $codes;
 }

@@ -25,7 +25,7 @@ $event = json_decode($payload, true);
 if(is_array($event) && isset($event['type']) && $event['type'] === 'checkout.session.completed') {
 	$session = isset($event['data']['object']) ? $event['data']['object'] : array();
 	if(!empty($session['id']) && (!isset($session['payment_status']) || $session['payment_status'] === 'paid')) {
-		buycode_fulfill($session['id']);
+		buycode_fulfill($session); // records the paid order from the session metadata (idempotent)
 	}
 }
 

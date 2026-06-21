@@ -18,17 +18,20 @@ if($sessionid === '') {
 		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode'.buycode_env_qs(buycode_env()).'">返回购买页</a>');
 }
 
-// Env comes from the order we recorded at checkout time (falls back to the URL param).
-$order = DB::fetch_first('SELECT * FROM '.DB::table('buycode_order').' WHERE sessionid=%s', array($sessionid));
-$env   = ($order && in_array($order['mode'], array('test','live'))) ? $order['mode'] : buycode_env();
-$base  = buycode_base_url($env);
+// No pending order exists (we only record paid orders) — env comes from the return URL (&env=…).
+$env  = buycode_env();
+$base = buycode_base_url($env);
 
 $codes = array();
 $sess = buycode_stripe('/checkout/sessions/'.rawurlencode($sessionid), null, 'GET', $cfg[$env.'_secret_key']);
 if(!empty($sess['id']) && isset($sess['payment_status']) && $sess['payment_status'] === 'paid') {
-	$codes = buycode_fulfill($sessionid);
-} elseif($order && $order['status'] == 1 && $order['codes'] !== '') {
-	$codes = explode(',', $order['codes']); // webhook already fulfilled
+	$codes = buycode_fulfill($sess); // records the paid order + issues codes (idempotent with the webhook)
+} else {
+	// Maybe the webhook already recorded it — read the paid row back.
+	$row = DB::fetch_first('SELECT codes, status FROM '.DB::table('buycode_order').' WHERE sessionid=%s', array($sessionid));
+	if($row && $row['status'] == 1 && $row['codes'] !== '') {
+		$codes = explode(',', $row['codes']);
+	}
 }
 
 if($codes) {

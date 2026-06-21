@@ -40,14 +40,12 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'metadata[email]'    => $email,
 			'metadata[quantity]' => $qty,
 			'metadata[env]'      => $env,
+			'metadata[uid]'      => intval($_G['uid']),
 		);
 		$sess = buycode_stripe('/checkout/sessions', $post, 'POST', $secret);
 		if(!empty($sess['id']) && !empty($sess['url'])) {
-			DB::query('INSERT INTO '.DB::table('buycode_order')
-				.' (sessionid, uid, email, quantity, amount, currency, codes, mode, status, dateline, paydateline) '
-				.'VALUES (%s, %d, %s, %d, %d, %s, %s, %s, 0, %d, 0)',
-				array($sess['id'], intval($_G['uid']), $email, $qty,
-					intval($cfg['unit_amount']) * $qty, $cfg['currency'], '', $env, TIMESTAMP), true);
+			// No DB row is created here on purpose — only PAID orders are recorded (on fulfillment),
+			// so unpaid checkouts never write to the database. Order details travel in the session metadata.
 			header('Location: '.$sess['url']);
 			exit();
 		}

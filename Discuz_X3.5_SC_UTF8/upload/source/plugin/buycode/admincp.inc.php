@@ -27,17 +27,6 @@ foreach(array('test', 'live') as $senv) {
 	updatecache('setting');
 	cpmsg(($senv === 'test' ? '测试' : '正式').'设置已保存 / Settings saved.', $cpu($senv), 'succeed');
 }
-// --- save: manual webhook signing secret (only for the Dashboard-managed path) ----------------------
-foreach(array('test', 'live') as $senv) {
-	if(!submitcheck('setsecret_'.$senv)) {
-		continue;
-	}
-	$raw = (array)dunserialize(C::t('common_setting')->fetch_setting('buycode'));
-	$raw[$senv.'_webhook_secret'] = trim((string)getgpc($senv.'_webhook_secret'));
-	C::t('common_setting')->update_setting('buycode', $raw);
-	updatecache('setting');
-	cpmsg('签名密钥已保存 / Signing secret saved.', $cpu($senv), 'succeed');
-}
 // --- save: SHARED tab ---------------------------------------------------------
 if(submitcheck('bcsubmit_shared')) {
 	$cur = strtolower(preg_replace('/[^a-zA-Z]/', '', (string)getgpc('currency')));
@@ -107,17 +96,19 @@ foreach(array('test', 'live') as $renv) {
 $cfg = buycode_config();
 $e   = function($v) { return htmlspecialchars((string)$v, ENT_QUOTES); };
 $onoff = function($name, $val) {
-	return '<select name="'.$name.'"><option value="1"'.($val ? ' selected' : '').'>是 Yes</option>'
-		.'<option value="0"'.(!$val ? ' selected' : '').'>否 No</option></select>';
+	return '<select name="'.$name.'" style="font-size:14px;padding:5px 8px;border-radius:6px">'
+		.'<option value="1"'.($val ? ' selected' : '').'>✅ 已开启 Enabled</option>'
+		.'<option value="0"'.(!$val ? ' selected' : '').'>⛔ 已关闭 Disabled</option></select>'
+		.' &nbsp; <b style="color:'.($val ? '#0a8f6a' : '#b25f00').'">'.($val ? '✅ 运行中 ON' : '⛔ 未开启 OFF').'</b>';
 };
 
 $tab = (string)getgpc('bctab');
 if(!in_array($tab, array('test', 'live', 'shared', 'orders'), true)) {
-	$tab = 'test';
+	$tab = 'shared';
 }
 
-// --- tab bar ------------------------------------------------------------------
-$tablabels = array('test' => '🧪 测试 Test', 'live' => '🚀 正式 Live', 'shared' => '⚙ 通用 Shared', 'orders' => '🧾 订单 Orders');
+// --- tab bar (order: Shared, Live, Orders, Test) ------------------------------
+$tablabels = array('shared' => '⚙ 通用 Shared', 'live' => '🚀 正式 Live', 'orders' => '🧾 订单 Orders', 'test' => '🧪 测试 Test');
 $nav = '<div style="margin:12px 0 0;border-bottom:2px solid #d8dce1">';
 foreach($tablabels as $k => $label) {
 	$on = ($k === $tab);
@@ -164,18 +155,13 @@ $render_env_tab = function($env, $label) use ($cfg, $e, $onoff, $selfurl) {
 	showtablefooter();
 	showformfooter();
 
-	// optional manual entry — only for people who created the webhook themselves in the Stripe Dashboard
-	showtableheader($label.' — 手动填写签名密钥（可选）/ manual signing secret (optional)');
-	showformheader($selfurl, '', 'sec'.$env);
-	showtablerow('', '', '<span class="smalltxt">大多数人不需要这一步。只有当你<b>在 Stripe 后台手动创建 Webhook</b>（而非上面的自动注册）时，才需要把签名密钥粘贴到这里。/ Most people can ignore this — only needed if you created the webhook manually in the Stripe Dashboard.</span><br /><input type="text" name="'.$env.'_webhook_secret" value="" class="txt" style="width:380px" placeholder="whsec_…" autocomplete="off" />');
-	showsubmit('setsecret_'.$env, '保存密钥 / Save secret');
-	showtablefooter();
-	showformfooter();
-
 	// integration URLs for this env
 	showtableheader($label.' — 对接网址 / URLs');
 	showtablerow('', '', '购买页 / Buy page：<a href="'.$e($buyurl).'" target="_blank">'.$e($buyurl).'</a>');
 	showtablerow('', '', 'Webhook URL：<code>'.$e($whurl).'</code> <span class="smalltxt">事件 Event：checkout.session.completed</span>');
+	if($env === 'test') {
+		showtablerow('', '', '🧪 测试卡号 / Test cards：<a href="https://docs.stripe.com/testing?testing-method=card-numbers#cards" target="_blank" rel="noopener">Stripe 测试卡号文档 ↗</a> <span class="smalltxt">付款时用，如 4242 4242 4242 4242，任意未来有效期 + 任意 CVC / e.g. 4242 4242 4242 4242</span>');
+	}
 	showtablefooter();
 };
 
@@ -187,6 +173,35 @@ if($tab === 'test') {
 	$render_env_tab('live', '🚀 正式 / LIVE');
 
 } elseif($tab === 'shared') {
+	// --- mail / SMTP status (codes are delivered by email, so this must be configured) ---
+	// Read fresh from common_setting (this build does NOT auto-unserialize $_G['setting']['mail']).
+	$mail    = (array)C::t('common_setting')->fetch_setting('mail', true);
+	$ms      = isset($mail['mailsend']) ? intval($mail['mailsend']) : 0;
+	$methods = array(1 => 'PHP mail() 函数', 2 => 'SMTP', 3 => 'Sendmail 程序', 4 => '插件 / plugin');
+	$mname   = isset($methods[$ms]) ? $methods[$ms] : '未设置 / not set';
+	if($ms == 2) {
+		// SMTP servers are a nested list: $mail['smtp'][n] => array('server','port','auth',...).
+		$smtp = (isset($mail['smtp']) && is_array($mail['smtp'])) ? $mail['smtp'] : array();
+		$srv = '';
+		foreach($smtp as $s) {
+			if(!empty($s['server'])) {
+				$srv = $s['server'].(!empty($s['port']) ? ':'.$s['port'] : '');
+				break;
+			}
+		}
+		$mailstatus = $srv !== ''
+			? '✅ <b style="color:#0a8f6a">SMTP 已配置 configured</b>（'.$e($srv).'）'
+			: '⚠️ <b style="color:#b25f00">选择了 SMTP，但未填写服务器</b> / SMTP selected but no server';
+	} elseif(in_array($ms, array(1, 3, 4), true)) {
+		$mailstatus = '✅ <b style="color:#0a8f6a">邮件发送已启用 enabled</b>（方式 method：'.$mname.'）—— 邀请码可通过邮件发送';
+	} else {
+		$mailstatus = '⛔ <b style="color:#c33">未配置邮件发送 not configured</b> —— 购买成功后无法把邀请码发到邮箱，请先配置';
+	}
+	showtableheader('📧 邮件发送状态 / Mail (SMTP) status');
+	showtablerow('', '', $mailstatus.' &nbsp; <a href="'.ADMINSCRIPT.'?action=setting&operation=mail">前往邮件设置 / Configure mail ↗</a>');
+	showtablerow('', '', '<span class="smalltxt">付款成功后，邀请码会用 Discuz 的邮件功能发送到买家邮箱，请确保上方为「已配置」。/ Codes are emailed via Discuz mail — make sure this shows configured.</span>');
+	showtablefooter();
+
 	showtableheader('⚙ 通用设置 / Shared settings（test 与 live 共用）');
 	showformheader($selfurl, '', 'bcshared');
 	showtablerow('', '', '单价 / Unit amount <span class="smalltxt">(最小货币单位，如美分 — 500 = $5.00)</span>：<input type="text" name="unit_amount" value="'.$e($cfg['unit_amount']).'" class="txt" style="width:100px" /> &nbsp; 货币 / Currency：<input type="text" name="currency" value="'.$e($cfg['currency']).'" class="txt" style="width:70px" /> &nbsp; <span class="smalltxt">当前 = <b>'.$e(buycode_format_price($cfg['unit_amount'], $cfg['currency'])).'</b></span>');
