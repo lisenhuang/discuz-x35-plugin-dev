@@ -1,17 +1,20 @@
 <?php
 /**
- * Public buy page — plugin.php?id=buycode  (guest-accessible via plugin.php default routing).
- * Shows price + quantity + email, then creates a Stripe Checkout Session and redirects to it.
- * UI text in Simplified Chinese.
+ * Public buy page — plugin.php?id=buycode (live) or plugin.php?id=buycode&env=test (test).
+ * Guest-accessible via plugin.php default routing. Picks the env's enable flag + secret key, creates a
+ * Stripe Checkout Session, and redirects to it. UI text in Simplified Chinese.
  */
 if(!defined('IN_DISCUZ')) { exit('Access Denied'); }
 
 require_once DISCUZ_ROOT.'./source/plugin/buycode/function_buycode.php';
 
-$cfg  = buycode_config();
-$base = buycode_base_url();
+$env    = buycode_env();
+$cfg    = buycode_config();
+$base   = buycode_base_url($env);
+$qs     = buycode_env_qs($env);
+$secret = $cfg[$env.'_secret_key'];
 
-if(!$cfg['enabled'] || $cfg['secret_key'] === '') {
+if(!$cfg[$env.'_enabled'] || $secret === '') {
 	buycode_render_page('暂未开放', '<h1>邀请码购买暂未开放</h1><p class="muted">请稍后再试，或联系管理员。</p>');
 }
 
@@ -26,24 +29,25 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
 	} else {
 		$post = array(
 			'mode'        => 'payment',
-			'success_url' => $base.'/plugin.php?id=buycode:return&session_id={CHECKOUT_SESSION_ID}',
-			'cancel_url'  => $base.'/plugin.php?id=buycode',
+			'success_url' => $base.'/plugin.php?id=buycode:return'.$qs.'&session_id={CHECKOUT_SESSION_ID}',
+			'cancel_url'  => $base.'/plugin.php?id=buycode'.$qs,
 			'customer_email'      => $email,
-			'client_reference_id' => 'buycode_'.intval($_G['uid']).'_'.TIMESTAMP,
+			'client_reference_id' => 'buycode_'.$env.'_'.intval($_G['uid']).'_'.TIMESTAMP,
 			'line_items[0][quantity]'                          => $qty,
 			'line_items[0][price_data][currency]'              => $cfg['currency'],
 			'line_items[0][price_data][unit_amount]'           => intval($cfg['unit_amount']),
 			'line_items[0][price_data][product_data][name]'    => $cfg['product_label'],
 			'metadata[email]'    => $email,
 			'metadata[quantity]' => $qty,
+			'metadata[env]'      => $env,
 		);
-		$sess = buycode_stripe('/checkout/sessions', $post, 'POST');
+		$sess = buycode_stripe('/checkout/sessions', $post, 'POST', $secret);
 		if(!empty($sess['id']) && !empty($sess['url'])) {
 			DB::query('INSERT INTO '.DB::table('buycode_order')
 				.' (sessionid, uid, email, quantity, amount, currency, codes, mode, status, dateline, paydateline) '
 				.'VALUES (%s, %d, %s, %d, %d, %s, %s, %s, 0, %d, 0)',
 				array($sess['id'], intval($_G['uid']), $email, $qty,
-					intval($cfg['unit_amount']) * $qty, $cfg['currency'], '', $cfg['mode'], TIMESTAMP), true);
+					intval($cfg['unit_amount']) * $qty, $cfg['currency'], '', $env, TIMESTAMP), true);
 			header('Location: '.$sess['url']);
 			exit();
 		}
@@ -56,13 +60,14 @@ $qopts = '';
 for($i = 1; $i <= $maxq; $i++) {
 	$qopts .= '<option value="'.$i.'">'.$i.'</option>';
 }
-$price = buycode_format_price($cfg['unit_amount'], $cfg['currency']);
+$price   = buycode_format_price($cfg['unit_amount'], $cfg['currency']);
+$testtag = $env === 'test' ? '<span class="tag">测试模式 TEST</span>' : '';
 
-$html = '<h1>购买邀请码</h1>'
+$html = '<h1>购买邀请码'.$testtag.'</h1>'
 	.'<p class="muted">'.htmlspecialchars($cfg['product_label']).'</p>'
 	.'<div class="price">'.$price.' <span class="muted" style="font-size:14px">/ 个</span></div>'
 	.($err ? '<div class="err">'.$err.'</div>' : '')
-	.'<form method="post" action="'.$base.'/plugin.php?id=buycode">'
+	.'<form method="post" action="'.$base.'/plugin.php?id=buycode'.$qs.'">'
 	.'<label>数量</label><select name="qty">'.$qopts.'</select>'
 	.'<label>接收邮箱（邀请码将发送到此邮箱）</label>'
 	.'<input type="email" name="email" required placeholder="you@example.com" value="'.htmlspecialchars($email, ENT_QUOTES).'">'

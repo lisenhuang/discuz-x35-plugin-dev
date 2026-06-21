@@ -25,12 +25,16 @@ DB::query("CREATE TABLE IF NOT EXISTS ".DB::table('buycode_order')." (
 // Seed default settings (only if not already present, so re-install keeps your config).
 if(!C::t('common_setting')->fetch_setting('buycode')) {
 	$defaults = array(
-		'enabled'             => 0,
-		'mode'                => 'test',
+		'test_enabled'        => 0,
 		'test_secret_key'     => '',
 		'test_webhook_secret' => '',
+		'test_webhook_id'     => '',
+		'test_base'           => '',
+		'live_enabled'        => 0,
 		'live_secret_key'     => '',
 		'live_webhook_secret' => '',
+		'live_webhook_id'     => '',
+		'live_base'           => '',
 		'unit_amount'         => 500,
 		'currency'            => 'usd',
 		'product_label'       => '论坛邀请码',

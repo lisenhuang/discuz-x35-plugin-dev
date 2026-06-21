@@ -1,34 +1,42 @@
 <?php
 /**
  * Shared helpers for the "buycode" plugin — sell Discuz built-in invite codes via Stripe.
- * Required by buycode.inc.php (buy page), return.inc.php (success), notify.inc.php (webhook)
- * and admincp.inc.php (settings). Codes are written to the core common_invite table (uid=0),
- * identical in shape to the invitecode plugin, so native invite-registration accepts them.
+ *
+ * Test and live run INDEPENDENTLY and side by side: the target environment is chosen per request by
+ * the ?env= URL param (env=test => test; anything else => live, which keeps the clean public URL).
+ * Each env has its own enable flag, secret key, webhook secret/id, and base URL (e.g. live = your
+ * production domain, test = a Cloudflare Tunnel domain). Codes go to the core common_invite table.
+ *
+ * Required by buycode.inc.php (buy), return.inc.php (success), notify.inc.php (webhook), admincp.inc.php.
  */
 if(!defined('IN_DISCUZ')) { exit('Access Denied'); }
 
 // 32-char unambiguous alphabet — excludes I, O, 0, 1 (look-alikes).
 define('BUYCODE_ALPHABET', '23456789ABCDEFGHJKLMNPQRSTUVWXYZ');
 
-/**
- * Settings (stored serialized in common_setting['buycode']) merged with defaults, plus the
- * resolved active secret_key/webhook_secret for the current test|live mode.
- */
+/** Settings (stored serialized in common_setting['buycode']) merged with defaults. */
 function buycode_config() {
 	global $_G;
 	$defaults = array(
-		'enabled'             => 0,
-		'mode'                => 'test',   // test | live
+		// --- test environment ---
+		'test_enabled'        => 0,
 		'test_secret_key'     => '',
 		'test_webhook_secret' => '',
+		'test_webhook_id'     => '',
+		'test_base'           => '',   // public base URL override for test (e.g. a Cloudflare Tunnel domain)
+		// --- live environment ---
+		'live_enabled'        => 0,
 		'live_secret_key'     => '',
 		'live_webhook_secret' => '',
-		'unit_amount'         => 500,      // smallest currency unit (e.g. cents)
+		'live_webhook_id'     => '',
+		'live_base'           => '',   // public base URL override for live (usually blank = auto-detect)
+		// --- shared ---
+		'unit_amount'         => 500,  // smallest currency unit (e.g. cents)
 		'currency'            => 'usd',
 		'product_label'       => '论坛邀请码',
 		'max_qty'             => 10,
 		'code_length'         => 6,
-		'expiry_days'         => 0,        // 0 = never
+		'expiry_days'         => 0,     // 0 = never
 		'redirect_url'        => 'member.php?mod=register',
 	);
 	$cfg = isset($_G['setting']['buycode']) ? $_G['setting']['buycode'] : '';
@@ -38,24 +46,56 @@ function buycode_config() {
 	if(!is_array($cfg)) {
 		$cfg = array();
 	}
-	$cfg = array_merge($defaults, $cfg);
-	$cfg['mode'] = $cfg['mode'] === 'live' ? 'live' : 'test';
-	$cfg['secret_key']     = $cfg['mode'] === 'live' ? $cfg['live_secret_key']     : $cfg['test_secret_key'];
-	$cfg['webhook_secret'] = $cfg['mode'] === 'live' ? $cfg['live_webhook_secret'] : $cfg['test_webhook_secret'];
-	return $cfg;
+	return array_merge($defaults, $cfg);
 }
 
-/** Absolute base URL of the current request (scheme + host, native ports omitted by the browser). */
-function buycode_base_url() {
+/** Target Stripe environment for this request: 'test' if ?env=test, else 'live' (the clean default). */
+function buycode_env() {
+	return getgpc('env') === 'test' ? 'test' : 'live';
+}
+
+/** URL query suffix that keeps a request in the given env ('&env=test' for test, '' for live). */
+function buycode_env_qs($env) {
+	return $env === 'test' ? '&env=test' : '';
+}
+
+/** Normalize a base URL/domain: assume https:// if no scheme, strip trailing slash. '' stays ''. */
+function buycode_norm_base($url) {
+	$url = trim((string)$url);
+	if($url === '') {
+		return '';
+	}
+	if(!preg_match('#^https?://#i', $url)) {
+		$url = 'https://'.$url; // tunnels are https; assume https when no scheme is given
+	}
+	return rtrim($url, '/');
+}
+
+/**
+ * Absolute base URL for the given env: a per-env override (e.g. a Cloudflare Tunnel domain for test,
+ * handy when the forum is only reachable at http://localhost during dev) or auto-detect from the request.
+ */
+function buycode_base_url($env = null) {
 	global $_G;
+	if($env === null) {
+		$env = buycode_env();
+	}
+	$cfg = isset($_G['setting']['buycode']) ? $_G['setting']['buycode'] : '';
+	if(is_string($cfg)) {
+		$cfg = dunserialize($cfg);
+	}
+	$override = (is_array($cfg) && !empty($cfg[$env.'_base'])) ? buycode_norm_base($cfg[$env.'_base']) : '';
+	if($override !== '') {
+		return $override;
+	}
 	$scheme = !empty($_G['scheme']) ? $_G['scheme'] : 'http';
 	$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 	return $scheme.'://'.$host;
 }
 
-/** Build an absolute register link with the invite code pre-attached (auto-fills the field). */
-function buycode_register_link($redirect_url, $code) {
-	$base = buycode_base_url();
+/** Build an absolute register link (in the given env's base) with the invite code pre-attached. */
+function buycode_register_link($redirect_url, $code, $env) {
+	$base = buycode_base_url($env);
 	$url = preg_match('#^https?://#i', $redirect_url) ? $redirect_url : $base.'/'.ltrim($redirect_url, '/');
 	$sep = strpos($url, '?') !== false ? '&' : '?';
 	return $url.$sep.'invitecode='.rawurlencode($code);
@@ -82,14 +122,10 @@ function buycode_gencode($len = 6) {
 }
 
 /**
- * Native cURL call to the Stripe REST API. Returns the decoded JSON array (with an extra
- * '_http' status key), or array('_error'=>..., '_http'=>0) on a transport error.
+ * Native cURL call to the Stripe REST API with an explicit (env-specific) secret key. Returns the
+ * decoded JSON array (with an extra '_http' key), or array('_error'=>..., '_http'=>0) on transport error.
  */
-function buycode_stripe($path, $post = null, $method = 'POST', $secret = null) {
-	if($secret === null) {
-		$cfg = buycode_config();
-		$secret = $cfg['secret_key'];
-	}
+function buycode_stripe($path, $post = null, $method = 'POST', $secret = '') {
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_URL, 'https://api.stripe.com/v1'.$path);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -146,9 +182,9 @@ function buycode_make_invites($quantity, $expiry_days, $code_length, $email) {
 }
 
 /**
- * Idempotently fulfill a paid Stripe Checkout session: atomically claim the pending order,
- * issue the codes, email them. Safe to call from both the webhook and the return page
- * (concurrent calls won't double-issue). Returns the issued codes.
+ * Idempotently fulfill a paid Stripe Checkout session: atomically claim the pending order, issue the
+ * codes, email them. Safe to call from both the webhook and the return page (no double-issue). The
+ * email's register link is built in the order's own env. Returns the issued codes.
  */
 function buycode_fulfill($sessionid) {
 	$sessionid = trim($sessionid);
@@ -171,22 +207,23 @@ function buycode_fulfill($sessionid) {
 		return ($row && $row['codes'] !== '') ? explode(',', $row['codes']) : array();
 	}
 	$cfg = buycode_config();
+	$env = $order['mode'] === 'live' ? 'live' : 'test';
 	$codes = buycode_make_invites($order['quantity'], $cfg['expiry_days'], $cfg['code_length'], $order['email']);
 	DB::query('UPDATE '.$tbl.' SET codes=%s WHERE orderid=%d', array(implode(',', $codes), $order['orderid']));
 	if($codes) {
-		buycode_mail($order['email'], $codes, $cfg['redirect_url']);
+		buycode_mail($order['email'], $codes, $cfg['redirect_url'], $env);
 	}
 	return $codes;
 }
 
-/** Email the issued codes (Simplified Chinese) with a one-click, code-prefilled register link. */
-function buycode_mail($to, $codes, $redirect_url) {
+/** Email the issued codes (Simplified Chinese) with a one-click, code-prefilled register link in $env's base. */
+function buycode_mail($to, $codes, $redirect_url, $env) {
 	global $_G;
 	if(!$to || !$codes) {
 		return false;
 	}
 	$sitename = $_G['setting']['bbname'];
-	$reglink  = buycode_register_link($redirect_url, $codes[0]);
+	$reglink  = buycode_register_link($redirect_url, $codes[0], $env);
 	$codelist = '';
 	foreach($codes as $c) {
 		$codelist .= '<div style="font-size:20px;font-weight:bold;letter-spacing:2px;margin:4px 0">'.htmlspecialchars($c).'</div>';
@@ -201,8 +238,8 @@ function buycode_mail($to, $codes, $redirect_url) {
 }
 
 /**
- * Verify a Stripe webhook signature against any of the configured webhook secrets
- * (so both test and live endpoints validate regardless of the mode toggle).
+ * Verify a Stripe webhook signature against any of the supplied webhook secrets (so both test and
+ * live endpoints validate). $secrets is an array of candidate signing secrets.
  */
 function buycode_verify_signature($payload, $sigheader, $secrets) {
 	if(!$sigheader || !$secrets) {
@@ -261,6 +298,7 @@ function buycode_render_page($title, $bodyhtml) {
 		.'.btn:hover{background:#524af0;}'
 		.'.code{font-size:24px;font-weight:700;letter-spacing:3px;background:#f0f7ff;border:1px dashed #9cc6ff;border-radius:9px;padding:13px;text-align:center;margin:8px 0;color:#1a56db;}'
 		.'.muted{color:#8a9099;font-size:13px;line-height:1.6;}'
+		.'.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;background:#fff4e5;color:#b25f00;margin-left:6px;vertical-align:middle;}'
 		.'.err{background:#fff1f1;border:1px solid #f3c0c0;color:#c33;padding:10px 12px;border-radius:9px;margin-bottom:12px;font-size:14px;}'
 		.'.foot{text-align:center;margin-top:16px;}.foot a{color:#9aa0a6;font-size:12px;text-decoration:none;}'
 		.'</style></head><body><div class="wrap"><div class="card">'

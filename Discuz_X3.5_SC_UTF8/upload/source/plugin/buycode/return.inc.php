@@ -1,34 +1,34 @@
 <?php
 /**
- * Success page — plugin.php?id=buycode:return&session_id={CHECKOUT_SESSION_ID}
- * Verifies the session with Stripe and fulfills as a fallback if the webhook hasn't landed yet,
- * then shows the code(s) and a code-prefilled "立即注册" button. UI text in Simplified Chinese.
+ * Success page — plugin.php?id=buycode:return&session_id={CHECKOUT_SESSION_ID}[&env=test].
+ * Derives the env from the stored order (robust), verifies payment with that env's key, and fulfills
+ * as a fallback if the webhook hasn't landed. Shows the code(s) + a code-prefilled register button.
  */
 if(!defined('IN_DISCUZ')) { exit('Access Denied'); }
 
 require_once DISCUZ_ROOT.'./source/plugin/buycode/function_buycode.php';
 
-$cfg  = buycode_config();
-$base = buycode_base_url();
+$cfg = buycode_config();
 
 $sessionid = trim((string)getgpc('session_id'));
 if($sessionid === '') {
+	$base = buycode_base_url(buycode_env());
 	buycode_render_page('未找到订单',
 		'<h1>未找到订单</h1><p class="muted">缺少订单信息。</p>'
-		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode">返回购买页</a>');
+		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode'.buycode_env_qs(buycode_env()).'">返回购买页</a>');
 }
 
+// Env comes from the order we recorded at checkout time (falls back to the URL param).
+$order = DB::fetch_first('SELECT * FROM '.DB::table('buycode_order').' WHERE sessionid=%s', array($sessionid));
+$env   = ($order && in_array($order['mode'], array('test','live'))) ? $order['mode'] : buycode_env();
+$base  = buycode_base_url($env);
+
 $codes = array();
-// Primary path: confirm payment with Stripe, then fulfill (idempotent).
-$sess = buycode_stripe('/checkout/sessions/'.rawurlencode($sessionid), null, 'GET');
+$sess = buycode_stripe('/checkout/sessions/'.rawurlencode($sessionid), null, 'GET', $cfg[$env.'_secret_key']);
 if(!empty($sess['id']) && isset($sess['payment_status']) && $sess['payment_status'] === 'paid') {
 	$codes = buycode_fulfill($sessionid);
-} else {
-	// Maybe the webhook already fulfilled it — read back the stored order.
-	$order = DB::fetch_first('SELECT codes, status FROM '.DB::table('buycode_order').' WHERE sessionid=%s', array($sessionid));
-	if($order && $order['status'] == 1 && $order['codes'] !== '') {
-		$codes = explode(',', $order['codes']);
-	}
+} elseif($order && $order['status'] == 1 && $order['codes'] !== '') {
+	$codes = explode(',', $order['codes']); // webhook already fulfilled
 }
 
 if($codes) {
@@ -36,7 +36,7 @@ if($codes) {
 	foreach($codes as $c) {
 		$codehtml .= '<div class="code">'.htmlspecialchars($c).'</div>';
 	}
-	$reglink = buycode_register_link($cfg['redirect_url'], $codes[0]);
+	$reglink = buycode_register_link($cfg['redirect_url'], $codes[0], $env);
 	$html = '<h1>支付成功 🎉</h1>'
 		.'<p class="muted">以下是您的邀请码（已发送至您的邮箱）：</p>'
 		.$codehtml
@@ -46,6 +46,6 @@ if($codes) {
 } else {
 	$html = '<h1>正在确认支付…</h1>'
 		.'<p class="muted">您的支付正在处理中，邀请码生成后会立即发送到您的邮箱，请稍后查收。</p>'
-		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode:return&session_id='.rawurlencode($sessionid).'">刷新查看</a>';
+		.'<a class="btn" href="'.$base.'/plugin.php?id=buycode:return'.buycode_env_qs($env).'&session_id='.rawurlencode($sessionid).'">刷新查看</a>';
 	buycode_render_page('处理中', $html);
 }
