@@ -23,9 +23,10 @@ for d in "$SRC"/*/; do
   name="$(cdata "$xml" name)";        [ -z "$name" ] && name="$id"
   desc="$(cdata "$xml" description)"
   rel="${SRC}/${id}/"
+  label="source/plugin/${id}/"
   doc="docs/plugins/${id}.md"
   doccell="—"; [ -f "$doc" ] && doccell="[📖 guide](${doc})"
-  rows+="| \`${id}\` | ${name} | ${doccell} | ${desc} | [\`${rel}\`](${rel}) |"$'\n'
+  rows+="| \`${id}\` | ${name} | ${doccell} | ${desc} | [\`${label}\`](${rel}) |"$'\n'
 done
 [ -z "$rows" ] && rows="| _(none yet)_ |  |  |  |  |"$'\n'
 

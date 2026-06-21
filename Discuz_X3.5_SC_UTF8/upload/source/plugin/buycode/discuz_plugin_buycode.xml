@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<item id="Title"><![CDATA[Discuz! Plugin]]></item>
+	<item id="Data">
+		<item id="plugin">
+			<item id="available"><![CDATA[1]]></item>
+			<item id="adminid"><![CDATA[1]]></item>
+			<item id="name"><![CDATA[Buy Invite Code (Stripe)]]></item>
+			<item id="identifier"><![CDATA[buycode]]></item>
+			<item id="description"><![CDATA[Sell Discuz built-in invitation codes through Stripe. Visitors open plugin.php?id=buycode, pick a quantity, enter an email, pay via Stripe Checkout, and receive a real common_invite code by email + on screen, with a one-click code-prefilled register link. Test/Live mode, configurable price, code length and webhook.]]></item>
+			<item id="datatables"><![CDATA[buycode_order]]></item>
+			<item id="directory"><![CDATA[buycode/]]></item>
+			<item id="copyright"><![CDATA[]]></item>
+			<item id="version"><![CDATA[1.0]]></item>
+			<item id="__modules">
+				<item id="0">
+					<item id="name"><![CDATA[admincp]]></item>
+					<item id="menu"><![CDATA[Settings]]></item>
+					<item id="url"><![CDATA[]]></item>
+					<item id="type"><![CDATA[3]]></item>
+					<item id="adminid"><![CDATA[1]]></item>
+					<item id="displayorder"><![CDATA[0]]></item>
+					<item id="param"><![CDATA[]]></item>
+				</item>
+			</item>
+		</item>
+		<item id="version"><![CDATA[X3.5]]></item>
+		<item id="installfile"><![CDATA[install.php]]></item>
+		<item id="uninstallfile"><![CDATA[uninstall.php]]></item>
+	</item>
+</root>
