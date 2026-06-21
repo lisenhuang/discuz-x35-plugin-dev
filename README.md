@@ -64,8 +64,8 @@ make new-plugin id=foo ─► edit source/plugin/foo/ ─► make enable-plugin 
 <!-- PLUGINS:START -->
 | ID | Name | Docs | Description | Path |
 | --- | --- | --- | --- | --- |
-| `helloworld` | Hello World | [📖 guide](docs/plugins/helloworld.md) | Example plugin: shows a footer banner on every page. | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
-| `invitecode` | Invitation Code Generator | [📖 guide](docs/plugins/invitecode.md) | Admin tool to bulk-generate invitation codes for Discuz's BUILT-IN invite registration (common_invite). Use with registration set to "invite code" mode. | [`Discuz_X3.5_SC_UTF8/upload/source/plugin/invitecode/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/invitecode/) |
+| `helloworld` | Hello World | [📖 guide](docs/plugins/helloworld.md) | Example plugin: shows a footer banner on every page. | [`source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
+| `invitecode` | Invitation Code Generator | [📖 guide](docs/plugins/invitecode.md) | Admin tool to bulk-generate invitation codes for Discuz's BUILT-IN invite registration (common_invite). Use with registration set to "invite code" mode. | [`source/plugin/invitecode/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/invitecode/) |
 <!-- PLUGINS:END -->
 
 ## ⚖️ Notes
