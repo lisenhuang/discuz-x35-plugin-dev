@@ -8,7 +8,9 @@
  * over the post table joined to forum_thread — first=1 rows are new threads, first=0 rows are replies —
  * applies the admin's filters (selected forums, read-permission ceiling), runs the configurable
  * message-cleanup pipeline, and POSTs to the Telegram Bot API. Effectively immediate (the poster's own
- * post-redirect lands on a page that fires the drain) and never double-sends (cursor + process lock).
+ * post-redirect lands on a page that fires the drain) and never double-sends: concurrent page renders
+ * are serialized by an atomic per-interval claim (a self-lock lease on last_scan), and the pid cursor is
+ * advanced after each successful send so a crash can't replay it.
  *
  * Required by tgnotify.class.php (hook) and admincp.inc.php (settings UI).
  */
@@ -355,7 +357,6 @@ function tgnotify_send($cfg, $data) {
  * concurrent page renders can't double-drain.
  */
 function tgnotify_tick($cfg = null) {
-	global $_G;
 	if($cfg === null) {
 		$cfg = tgnotify_config();
 	}
@@ -363,15 +364,35 @@ function tgnotify_tick($cfg = null) {
 		return;
 	}
 	$interval = max(1, intval($cfg['drain_interval']));
-	$state = tgnotify_state();
-	if(TIMESTAMP - intval($state['last_scan']) < $interval) {
+	$now   = TIMESTAMP;
+	$state = tgnotify_state();                        // cheap PK read (self-heals the row)
+	// Fast path: throttled, or another render is mid-drain (a running drain parks last_scan in the future).
+	if($now - intval($state['last_scan']) < $interval) {
 		return;
 	}
-	if(class_exists('discuz_process') && discuz_process::islocked('tgnotify_drain', 60, 1)) {
-		return;     // another render is draining right now
+	// Atomically claim the drain slot. Parking last_scan in the future doubles as a lock lease, so exactly
+	// ONE concurrent render wins this conditional UPDATE (InnoDB row lock) — this is what prevents double-sends.
+	// (We can't use discuz_process here: with no memcache/redis it locks via REPLACE INTO, which always
+	// "succeeds", so two simultaneous renders would BOTH think they hold the lock and both drain.)
+	$lease = 300;
+	DB::query('UPDATE '.DB::table('tgnotify_state').' SET last_scan=%d WHERE id=1 AND last_scan<=%d',
+		array($now + $lease, $now - $interval));
+	if(DB::affected_rows() < 1) {
+		return;                                       // lost the race to a concurrent render
 	}
-	tgnotify_state_update(array('last_scan' => TIMESTAMP));
+	register_shutdown_function('tgnotify_unlock');    // release the lease even if the drain throws/dies
 	tgnotify_drain($cfg);
+	tgnotify_unlock();
+}
+
+/** Release the drain lease: set last_scan to the real completion time. Idempotent within a request. */
+function tgnotify_unlock() {
+	static $done = false;
+	if($done) {
+		return;
+	}
+	$done = true;
+	DB::query('UPDATE '.DB::table('tgnotify_state').' SET last_scan=%d WHERE id=1', array(TIMESTAMP));
 }
 
 /**
@@ -390,6 +411,7 @@ function tgnotify_drain($cfg) {
 	}
 	$maxread  = intval($cfg['max_readperm']);
 	$retrymax = max(1, intval($cfg['retry_max']));
+	$tbl      = DB::table('tgnotify_state');
 
 	$ptable = DB::table(tgnotify_posttable());
 	$ttable = DB::table('forum_thread');
@@ -405,11 +427,11 @@ function tgnotify_drain($cfg) {
 	}
 
 	$base       = tgnotify_base_url($cfg);
-	$newcursor  = $cursor;
 	$fail_pid   = intval($state['fail_pid']);
 	$fail_count = intval($state['fail_count']);
-	$sent = 0; $failed = 0; $lasterror = '';
 
+	// The cursor is advanced atomically AFTER each item (WHERE last_pid<pid keeps it monotonic), so a crash
+	// mid-batch never re-sends an already-delivered message — together with the tick lock this stops dupes.
 	foreach($rows as $r) {
 		$pid = intval($r['pid']);
 
@@ -422,49 +444,32 @@ function tgnotify_drain($cfg) {
 			|| (empty($r['first']) && empty($cfg['send_reply']));            // replies disabled
 
 		if($skip) {
-			$newcursor = $pid;
+			DB::query('UPDATE '.$tbl.' SET last_pid=%d WHERE id=1 AND last_pid<%d', array($pid, $pid));
 			continue;
 		}
 
 		$res = tgnotify_send($cfg, tgnotify_build($cfg, $r, $base));
 		if($res['ok']) {
-			$sent++;
-			$newcursor  = $pid;
-			$fail_pid   = 0;
-			$fail_count = 0;
+			// Persist the cursor IMMEDIATELY after a successful send (crash-safe: this pid won't be re-sent).
+			DB::query('UPDATE '.$tbl.' SET last_pid=%d, sent=sent+1, lastsend=%d, fail_pid=0, fail_count=0, lasterror=%s WHERE id=1 AND last_pid<%d',
+				array($pid, TIMESTAMP, '', $pid));
+			$fail_pid = 0; $fail_count = 0;
 			continue;
 		}
 
 		// send failed
-		$failed++;
-		$lasterror  = $res['desc'];
 		$fail_count = ($fail_pid === $pid) ? $fail_count + 1 : 1;
 		$fail_pid   = $pid;
 		if($fail_count >= $retrymax) {
 			tgnotify_debug('SKIP pid '.$pid.' after '.$fail_count.' tries: '.$res['desc']);
-			$lasterror  = '已跳过 pid '.$pid.'（'.$fail_count.' 次失败）: '.$res['desc'];
-			$newcursor  = $pid;     // give up, move past so the queue isn't stuck
-			$fail_pid   = 0;
-			$fail_count = 0;
+			DB::query('UPDATE '.$tbl.' SET last_pid=%d, failed=failed+1, fail_pid=0, fail_count=0, lasterror=%s WHERE id=1 AND last_pid<%d',
+				array($pid, mb_substr('已跳过 pid '.$pid.'：'.$res['desc'], 0, 250, 'UTF-8'), $pid));
+			$fail_pid = 0; $fail_count = 0;
 			continue;
 		}
-		break;     // transient: stop here, retry from this pid next tick
+		// transient failure: record it and stop; retry from this pid on the next tick
+		DB::query('UPDATE '.$tbl.' SET failed=failed+1, fail_pid=%d, fail_count=%d, lasterror=%s WHERE id=1',
+			array($pid, $fail_count, mb_substr($res['desc'], 0, 250, 'UTF-8')));
+		break;
 	}
-
-	$upd = array(
-		'last_pid'   => $newcursor,
-		'fail_pid'   => $fail_pid,
-		'fail_count' => $fail_count,
-	);
-	if($lasterror !== '') {
-		$upd['lasterror'] = mb_substr($lasterror, 0, 250, 'UTF-8');
-	}
-	if($sent) {
-		$upd['sent']     = intval($state['sent']) + $sent;
-		$upd['lastsend'] = TIMESTAMP;
-	}
-	if($failed) {
-		$upd['failed'] = intval($state['failed']) + $failed;
-	}
-	tgnotify_state_update($upd);
 }
