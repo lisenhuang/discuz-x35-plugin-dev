@@ -5,9 +5,9 @@
 		<item id="plugin">
 			<item id="available"><![CDATA[1]]></item>
 			<item id="adminid"><![CDATA[1]]></item>
-			<item id="name"><![CDATA[Telegram Push 推送]]></item>
+			<item id="name"><![CDATA[Telegram Push]]></item>
 			<item id="identifier"><![CDATA[tgnotify]]></item>
-			<item id="description"><![CDATA[Push every new thread and reply to a Telegram channel. Pick which forums (板块) are forwarded, set a read-permission ceiling, and configure the message-cleanup rules (quotes/urls/hidden/attachments -> emoji, strip bbcode, truncate). Pure plugin — no core edits.]]></item>
+			<item id="description"><![CDATA[Push every new thread and reply to a Telegram channel. Pick which forums (boards) are forwarded, set a read-permission ceiling, and configure the message-cleanup rules (quotes/urls/hidden/attachments to emoji, strip bbcode, truncate). Pure plugin - no core edits.]]></item>
 			<item id="datatables"><![CDATA[tgnotify_state]]></item>
 			<item id="directory"><![CDATA[tgnotify/]]></item>
 			<item id="copyright"><![CDATA[]]></item>

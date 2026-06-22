@@ -20,9 +20,16 @@ if(submitcheck('apsubmit')) {
 	$raw['enabled']     = intval(getgpc('enabled'));
 	$raw['exemptadmin'] = intval(getgpc('exemptadmin'));
 	$msg = trim((string)getgpc('message'));
-	$defaults = avatarpost_defaults();
-	$raw['message'] = $msg !== '' ? $msg : $defaults['message'];
-	C::t('common_setting')->update_setting('avatarpost', array_merge($defaults, $raw));
+	$def = avatarpost_defaults();
+	// Only store a *custom* message. Empty, or left at the built-in default, means
+	// "use the default" — so nothing Chinese is written to the DB and the prompt is
+	// safe even on a site whose database charset would otherwise mangle it.
+	if($msg === '' || $msg === $def['message']) {
+		unset($raw['message']);
+	} else {
+		$raw['message'] = $msg;
+	}
+	C::t('common_setting')->update_setting('avatarpost', $raw);
 	updatecache('setting');
 	cpmsg('设置已保存。 / Settings saved.', 'action='.$selfurl, 'succeed');
 }
@@ -38,7 +45,7 @@ showtableheader('发帖头像限制 —— 未设置头像的用户禁止发帖�
 showformheader($selfurl, 'apsubmit');
 showtablerow('', '', '<b>总开关</b><br /><span style="color:#888">启用后，未上传头像的会员将无法发布主题或回复。</span> &nbsp; '.$onoff('enabled', $cfg['enabled']));
 showtablerow('', '', '<b>管理组豁免</b><br /><span style="color:#888">开启时，管理员 / 版主等管理组成员不受限制（推荐，避免管理员被锁在外面）。</span> &nbsp; '.$onoff('exemptadmin', $cfg['exemptadmin']));
-showtablerow('', '', '<b>提示文字</b><br /><span style="color:#888">会员未设置头像、尝试发帖时显示的提示（系统会自动在下方附上「立即设置头像」按钮）。</span><br />'
+showtablerow('', '', '<b>提示文字</b><br /><span style="color:#888">会员未设置头像、尝试发帖时显示的提示（系统会自动在下方附上「立即设置头像」按钮）。留空则使用内置默认文字（不写入数据库，避免编码问题）。</span><br />'
 	.'<textarea name="message" rows="3" style="width:96%;margin-top:6px" class="px">'.htmlspecialchars((string)$cfg['message'], ENT_QUOTES).'</textarea>');
 showsubmit('apsubmit', '保存 / Save');
 showtablefooter();

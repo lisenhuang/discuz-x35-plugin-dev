@@ -10,7 +10,15 @@ require_once DISCUZ_ROOT.'./source/plugin/avatarpost/function_avatarpost.php';
 
 $cur = C::t('common_setting')->fetch_setting('avatarpost');
 $cur = $cur ? (array)dunserialize($cur) : array();
-C::t('common_setting')->update_setting('avatarpost', array_merge(avatarpost_defaults(), $cur));
+
+// Seed only ASCII settings into the DB. The Chinese prompt text is deliberately
+// NOT persisted — it lives as a PHP literal in avatarpost_defaults() and is echoed
+// straight to the page, so it can never be turned into "????" by a mis-configured
+// database charset. We also drop any previously stored 'message' on every (re)import
+// so an already-mangled value gets purged; an admin can re-enter a custom one later.
+unset($cur['message']);
+$seed = array('enabled' => 1, 'exemptadmin' => 1);
+C::t('common_setting')->update_setting('avatarpost', array_merge($seed, $cur));
 
 if(!function_exists('updatecache')) {
 	require_once DISCUZ_ROOT.'./source/function/function_cache.php';
