@@ -67,6 +67,7 @@ make new-plugin id=foo ─► edit source/plugin/foo/ ─► make enable-plugin 
 | `buycode` | Buy Invite Code (Stripe) | [📖 guide](docs/plugins/buycode.md) | Sell Discuz built-in invitation codes through Stripe. Visitors open plugin.php?id=buycode, pick a quantity, enter an email, pay via Stripe Checkout, and receive a real common_invite code by email + on screen, with a one-click code-prefilled register link. Test/Live mode, configurable price, code length and webhook. | [`source/plugin/buycode/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/buycode/) |
 | `helloworld` | Hello World | [📖 guide](docs/plugins/helloworld.md) | Example plugin: shows a footer banner on every page. | [`source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
 | `invitecode` | Invitation Code Generator | [📖 guide](docs/plugins/invitecode.md) | Admin tool to bulk-generate invitation codes for Discuz's BUILT-IN invite registration (common_invite). Use with registration set to "invite code" mode. | [`source/plugin/invitecode/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/invitecode/) |
+| `tgnotify` | Telegram Push 推送 | [📖 guide](docs/plugins/tgnotify.md) | Push every new thread and reply to a Telegram channel. Pick which forums (板块) are forwarded, set a read-permission ceiling, and configure the message-cleanup rules (quotes/urls/hidden/attachments -> emoji, strip bbcode, truncate). Pure plugin — no core edits. | [`source/plugin/tgnotify/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/tgnotify/) |
 <!-- PLUGINS:END -->
 
 ## ⚖️ Notes
