@@ -53,6 +53,29 @@ Open **Admin CP → Apps → Plugins → AI Database Assistant** — three tabs:
   - **Max rows per query** — caps how many rows a SELECT returns to the AI (token control).
 - **🧾 Activity log** — newest-first list of every database action, with the SQL and row counts.
 
+## 🖼️ Screenshots
+
+### Write approval
+
+Before a data-changing statement runs, the assistant shows its exact SQL, the estimated affected row
+count, and **Approve & run** / **Reject** controls.
+
+![AI Database Assistant showing a proposed DELETE statement, with approval controls and an execution result](images/aiagent-write-approval.jpg)
+
+### Model picker
+
+The Settings tab lists the free models available through the configured OpenRouter account. Models that
+support tool calling are marked as recommended for database Q&A.
+
+![OpenRouter free-model picker with Google Gemma 4 31B selected](images/aiagent-model-picker.jpg)
+
+### Activity log
+
+The Activity log records every read and approved write, including the user, action, SQL, affected rows,
+and outcome.
+
+![AI Database Assistant activity log showing read queries and an approved DELETE statement](images/aiagent-activity-log.jpg)
+
 ### How writes are gated
 
 ```
