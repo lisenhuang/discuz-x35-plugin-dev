@@ -64,6 +64,7 @@ make new-plugin id=foo ─► edit source/plugin/foo/ ─► make enable-plugin 
 <!-- PLUGINS:START -->
 | ID | Name | Docs | Description | Path |
 | --- | --- | --- | --- | --- |
+| `aiagent` | AI Database Assistant | [📖 guide](docs/plugins/aiagent.md) | Chat with an AI (via OpenRouter, free models supported) inside the admin panel. Ask questions about your forum database in plain language; the AI runs read-only queries to answer. Optionally let it propose INSERT/UPDATE/DELETE changes that only run after you click Approve. Founder-only, with a full audit log. | [`source/plugin/aiagent/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/aiagent/) |
 | `avatarpost` | 发帖头像限制 | [📖 guide](docs/plugins/avatarpost.md) | 未上传头像的用户禁止发帖和回复（主题、回复、快速回复）。可自定义提示文字、开关，以及是否豁免管理组。 | [`source/plugin/avatarpost/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/avatarpost/) |
 | `buycode` | Buy Invite Code (Stripe) | [📖 guide](docs/plugins/buycode.md) | Sell Discuz built-in invitation codes through Stripe. Visitors open plugin.php?id=buycode, pick a quantity, enter an email, pay via Stripe Checkout, and receive a real common_invite code by email + on screen, with a one-click code-prefilled register link. Test/Live mode, configurable price, code length and webhook. | [`source/plugin/buycode/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/buycode/) |
 | `helloworld` | Hello World | [📖 guide](docs/plugins/helloworld.md) | Example plugin: shows a footer banner on every page. | [`source/plugin/helloworld/`](Discuz_X3.5_SC_UTF8/upload/source/plugin/helloworld/) |
