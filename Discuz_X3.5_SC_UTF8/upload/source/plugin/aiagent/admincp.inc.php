@@ -21,6 +21,7 @@ if(submitcheck('aiagent_conn')) {
 	$raw['model']    = trim((string)getgpc('model'));
 	$base            = trim((string)getgpc('base_url'));
 	$raw['base_url'] = $base !== '' ? $base : 'https://openrouter.ai/api/v1';
+	$raw['http_timeout'] = max(15, min(180, intval(getgpc('http_timeout'))));
 	// API key: only overwrite when a fresh, non-masked value is submitted (blank keeps the stored one).
 	$newkey = trim((string)getgpc('api_key'));
 	if($newkey !== '' && strpos($newkey, "\xe2\x80\xa2") === false) {
@@ -308,7 +309,7 @@ CSS;
 		busy=true; elSend.disabled=true; typing(true);
 		post({mode:'chat',messages:history}).then(function(res){
 			typing(false); busy=false; elSend.disabled=false;
-			if(!res||!res.ok){ bubble('assistant','<p class="ai-err">⚠️ '+esc(res&&res.error||'Request failed')+'</p>'); return; }
+			if(!res||!res.ok){ var er=render(res&&res.error||'Request failed'); bubble('assistant','<div class="ai-err">⚠️ '+er.html+'</div>'); return; }
 			var reply=res.reply||'';
 			if(reply.trim()!==''){
 				var r=render(reply); var bub=bubble('assistant',r.html);
@@ -371,6 +372,7 @@ JS;
 		.'<span id="ai-model-status" class="smalltxt"></span></div>'
 		.'<span class="smalltxt">Pick from your account\'s <b>free</b> models, fetched live from OpenRouter. 🔧 = supports <b>tool calling</b> (needed for database Q&amp;A). You can also type any model id in the box above.</span>');
 	showtablerow('', '', 'API base URL：<input type="text" name="base_url" value="'.$e($cfg['base_url']).'" class="txt" style="width:340px" /> <span class="smalltxt">(default: https://openrouter.ai/api/v1)</span>');
+	showtablerow('', '', 'Request timeout (s) / 请求超时：<input type="text" name="http_timeout" value="'.$e($cfg['http_timeout']).'" class="txt" style="width:90px" /> <span class="smalltxt">Seconds to wait for the model <b>per step</b> (15–180). Raise it for slow free models / multi-step questions; lower it to fail faster.</span>');
 	showsubmit('aiagent_conn', 'Save / 保存');
 	showtablefooter();
 	showformfooter();

@@ -49,6 +49,8 @@ Open **Admin CP → Apps → Plugins → AI Database Assistant** — three tabs:
     endpoint (🔧 marks the ones that support **tool calling**, recommended — needed for DB Q&A; models
     without it still work through a one-click *Run SQL* fallback). Pick one or type any model id in the
     box. Hit **↻ Refresh** to reload the list. Default: `meta-llama/llama-3.3-70b-instruct:free`.
+  - **Request timeout** — seconds to wait for the model **per step** (15–180, default 60). Raise it for
+    slow free models / multi-step questions; lower it to fail faster. (Timeouts aren't retried.)
   - **Write mode** — `🔒 Read-only` (default) or `✏️ Allow writes — with manual Approve`.
   - **Max rows per query** — caps how many rows a SELECT returns to the AI (token control).
 - **🧾 Activity log** — newest-first list of every database action, with the SQL and row counts.

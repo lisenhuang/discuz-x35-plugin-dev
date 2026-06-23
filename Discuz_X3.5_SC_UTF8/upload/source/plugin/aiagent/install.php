@@ -32,7 +32,7 @@ $defaults = array(
 	'max_rows'         => 50,
 	'max_result_bytes' => 12000,
 	'max_iters'        => 6,
-	'http_timeout'     => 45,
+	'http_timeout'     => 60,
 );
 $cur = C::t('common_setting')->fetch_setting('aiagent');
 $cur = $cur ? (array)dunserialize($cur) : array();

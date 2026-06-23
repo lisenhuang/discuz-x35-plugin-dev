@@ -26,7 +26,7 @@ function aiagent_config() {
 		'max_rows'         => 50,      // cap rows returned to the model per SELECT
 		'max_result_bytes' => 12000,   // cap JSON bytes of a tool result (token control)
 		'max_iters'        => 6,       // cap tool-calling round trips per turn
-		'http_timeout'     => 45,      // seconds for an OpenRouter request
+		'http_timeout'     => 60,      // seconds to wait for one OpenRouter request (slow free models)
 	);
 	$cfg = isset($_G['setting']['aiagent']) ? $_G['setting']['aiagent'] : '';
 	if(is_string($cfg)) {
@@ -127,40 +127,80 @@ function aiagent_openrouter($cfg, $messages, $tools = array()) {
 	$base = trim((string)$cfg['base_url']);
 	$base = $base !== '' ? rtrim($base, '/') : 'https://openrouter.ai/api/v1';
 
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_URL, $base.'/chat/completions');
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-	curl_setopt($ch, CURLOPT_POST, true);
-	curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-	curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-		'Authorization: Bearer '.$cfg['api_key'],
-		'Content-Type: application/json',
-		'HTTP-Referer: '.aiagent_site_url(),
-		'X-Title: Discuz AI Agent',
-	));
-	curl_setopt($ch, CURLOPT_TIMEOUT, max(15, intval($cfg['http_timeout'])));
-	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-	curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
-	$body  = curl_exec($ch);
-	$errno = curl_errno($ch);
-	$errstr= curl_error($ch);
-	$http  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-	curl_close($ch);
+	$json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-	if($errno) {
-		return array('_error' => 'Network error (curl#'.$errno.'): '.$errstr);
+	// Free models/providers are flaky — retry transient failures (network, 5xx, 429, "provider
+	// returned error", rate limit, overload). Deterministic errors (bad request/auth) fail fast.
+	$attempts = 3;
+	$lasterr  = 'request failed';
+	for($try = 0; $try < $attempts; $try++) {
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $base.'/chat/completions');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+			'Authorization: Bearer '.$cfg['api_key'],
+			'Content-Type: application/json',
+			'HTTP-Referer: '.aiagent_site_url(),
+			'X-Title: Discuz AI Agent',
+		));
+		curl_setopt($ch, CURLOPT_TIMEOUT, max(15, intval($cfg['http_timeout'])));
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+		curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
+		$body  = curl_exec($ch);
+		$errno = curl_errno($ch);
+		$errstr= curl_error($ch);
+		$http  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+
+		if($errno) {
+			if($errno === 28) {
+				// operation timed out — the model is slow; retrying won't make it faster, so fail fast.
+				$secs = max(15, intval($cfg['http_timeout']));
+				return array('_error' => 'The model took too long and timed out after '.$secs.'s. '
+					.'Free models can be slow on multi-step questions — raise "Request timeout" in Settings, '
+					.'or switch to a faster 🔧 model (e.g. meta-llama/llama-3.3-70b-instruct:free).');
+			}
+			$lasterr = 'Network error (curl#'.$errno.'): '.$errstr;
+			usleep(400000 * ($try + 1));
+			continue; // other transport errors (reset/DNS) — retry
+		}
+		$data = json_decode((string)$body, true);
+		if(!is_array($data)) {
+			$lasterr = 'Invalid response from the API (HTTP '.$http.').';
+			if($http >= 500) { usleep(400000 * ($try + 1)); continue; }
+			return array('_error' => $lasterr);
+		}
+		if(isset($data['error'])) {
+			$err  = $data['error'];
+			$em   = is_array($err) && isset($err['message']) ? $err['message'] : (is_string($err) ? $err : 'unknown API error');
+			$code = is_array($err) && isset($err['code']) ? $err['code'] : $http;
+			// Surface the real upstream cause (which provider, and its raw error) when present.
+			$detail = '';
+			if(is_array($err) && isset($err['metadata']) && is_array($err['metadata'])) {
+				$md = $err['metadata'];
+				if(!empty($md['provider_name'])) { $detail .= ' [provider: '.$md['provider_name'].']'; }
+				if(!empty($md['raw'])) {
+					$raw = is_string($md['raw']) ? $md['raw'] : json_encode($md['raw'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+					// Admin-only tool — show generous detail so the upstream cause is visible.
+					$detail .= ' — '.(function_exists('mb_substr') ? mb_substr($raw, 0, 1500, 'UTF-8') : substr($raw, 0, 1500));
+				}
+			}
+			$lasterr = 'API error '.$code.': '.$em.$detail;
+			$transient = intval($code) >= 500 || intval($code) === 429
+				|| stripos($em, 'provider returned error') !== false
+				|| stripos($em, 'rate') !== false
+				|| stripos($em, 'overload') !== false
+				|| stripos($em, 'timeout') !== false
+				|| stripos($em, 'temporarily') !== false;
+			if($transient && $try < $attempts - 1) { usleep(600000 * ($try + 1)); continue; }
+			return array('_error' => $lasterr);
+		}
+		$data['_http'] = $http;
+		return $data;
 	}
-	$data = json_decode((string)$body, true);
-	if(!is_array($data)) {
-		return array('_error' => 'Invalid response from the API (HTTP '.$http.').');
-	}
-	if(isset($data['error'])) {
-		$em = is_array($data['error']) && isset($data['error']['message']) ? $data['error']['message']
-			: (is_string($data['error']) ? $data['error'] : 'unknown API error');
-		return array('_error' => 'API error: '.$em);
-	}
-	$data['_http'] = $http;
-	return $data;
+	return array('_error' => $lasterr.' (after '.$attempts.' attempts)');
 }
 
 /**

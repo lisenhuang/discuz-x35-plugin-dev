@@ -101,10 +101,18 @@ $iter      = 0;
 for(; $iter < $maxiters; $iter++) {
 	$resp = aiagent_openrouter($cfg, $messages, $tools);
 	if(isset($resp['_error'])) {
-		aiagent_json_out(array('ok' => false, 'error' => $resp['_error']));
+		$emsg = $resp['_error'];
+		// Provider/transient failures survived the retries — guide the admin toward a fix.
+		if(stripos($emsg, 'provider returned error') !== false || stripos($emsg, 'after ') !== false || stripos($emsg, 'overload') !== false || stripos($emsg, 'rate') !== false) {
+			$emsg .= "\n\n_The selected free model/provider looks busy or rate-limited. Try again, or switch to another 🔧 tool-capable model in **Settings**._";
+		}
+		aiagent_json_out(array('ok' => false, 'error' => $emsg));
 	}
 	if(empty($resp['choices'][0]['message'])) {
-		aiagent_json_out(array('ok' => false, 'error' => 'The model returned an empty response.'));
+		// Surface the raw response so the admin can see why (finish_reason, content filter, etc.).
+		$snip = json_encode($resp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+		$snip = function_exists('mb_substr') ? mb_substr($snip, 0, 1200, 'UTF-8') : substr($snip, 0, 1200);
+		aiagent_json_out(array('ok' => false, 'error' => "The model returned no message.\n\n```\n".$snip."\n```"));
 	}
 	$msg = $resp['choices'][0]['message'];
 
